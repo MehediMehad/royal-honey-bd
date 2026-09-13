@@ -102,6 +102,7 @@ enum PaymentStatus {
 
 enum OrderStatus {
   PENDING
+  PAYMENT_VERIFICATION_PENDING
   CONFIRMED
   PROCESSING
   SHIPPED

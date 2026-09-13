@@ -2,6 +2,7 @@ import express from 'express';
 import { AuthRoutes } from '../app/modules/auth/auth.route';
 import { KnowledgeRoutes } from '../app/modules/knowledge/knowledge.route';
 import { ProductRoutes } from '../app/modules/products/product.route';
+import { OrderRoutes } from '../app/modules/order/order.route';
 import { WebhookRoutes } from '../app/modules/webhook/webhook.route';
 
 const router = express.Router();
@@ -14,6 +15,10 @@ const moduleRoutes = [
   {
     path: '/products',
     route: ProductRoutes,
+  },
+  {
+    path: '/orders',
+    route: OrderRoutes,
   },
   {
     path: '/knowledge',

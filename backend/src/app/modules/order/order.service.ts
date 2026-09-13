@@ -288,7 +288,14 @@ const verifyAdvancePayment = async (
     console.error('Error in sendOrderConfirmedAlert:', err),
   );
 
-  return updatedOrder;
+  // Auto-book courier parcel
+  try {
+    const { CourierServices } = await import('../courier/courier.service');
+    return await CourierServices.bookOrderParcel(orderId);
+  } catch (err) {
+    console.warn('⚠️ Auto courier booking failed on payment verification:', err);
+    return updatedOrder;
+  }
 };
 
 /**

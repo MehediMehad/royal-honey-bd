@@ -4,6 +4,7 @@ import catchAsync from '../../helpers/catchAsync';
 import pick from '../../helpers/pick';
 import sendResponse from '../../utils/sendResponse';
 import { OrderServices } from './order.service';
+import { InvoiceServices } from './invoice.service';
 
 const createDirectOrder = catchAsync(async (req: Request, res: Response) => {
   const result = await OrderServices.createAtomicOrder(req.body);
@@ -51,6 +52,14 @@ const getOrderById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getInvoice = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const html = await InvoiceServices.generateInvoiceHtml(id);
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 const verifyAdvancePayment = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const adminUser = (req as any).user;
@@ -85,6 +94,7 @@ export const OrderControllers = {
   createDirectOrder,
   getAllOrders,
   getOrderById,
+  getInvoice,
   verifyAdvancePayment,
   updateOrderStatus,
 };

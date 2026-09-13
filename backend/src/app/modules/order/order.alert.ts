@@ -87,12 +87,17 @@ export const OrderAlerts = {
    * Alert when an order is confirmed (COD or verified advance payment)
    */
   async sendOrderConfirmedAlert(order: any, customer: any): Promise<void> {
+    const courierInfo = order.trackingCode
+      ? `কুরিয়ার ট্র্যাকিং: ${order.trackingCode} (${order.courierProvider || 'Steadfast'})\nট্র্যাকিং লিংক: https://steadfast.com.bd/t/${order.trackingCode}`
+      : 'কুরিয়ার বুকিং: প্রক্রিয়াধীন (Pending Booking)';
+
     console.log(`
 🛒 ==================== NEW ORDER CONFIRMED ==================== 🛒
 অর্ডার আইডি: ${order.id}
 গ্রাহক: ${customer.name} (${customer.phone})
 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}
 মোট প্রদেয়: ৳${order.totalAmount} (${order.paymentMethod})
+${courierInfo}
 আইটেম সংখ্যা: ${order.items?.length || 0}
 ড্যাশবোর্ড ভিউ: ${config.urls.frontend_url}/orders/${order.id}
 ================================================================
@@ -115,12 +120,69 @@ export const OrderAlerts = {
             paymentMethod: order.paymentMethod,
             paymentStatus: order.paymentStatus,
             orderStatus: order.orderStatus,
+            courierProvider: order.courierProvider,
+            consignmentId: order.consignmentId,
+            trackingCode: order.trackingCode,
+            trackingUrl: order.trackingCode
+              ? `https://steadfast.com.bd/t/${order.trackingCode}`
+              : null,
             timestamp: new Date().toISOString(),
           },
           { timeout: 5000 },
         );
       } catch (err: any) {
         console.warn('⚠️ [OrderAlerts] Failed to send Order Confirmed webhook to n8n:', err?.message || err);
+      }
+    }
+  },
+
+  /**
+   * Sync confirmed order data to Google Sheets via n8n webhook (Section 19 Backup)
+   */
+  async sendGoogleSheetBackup(order: any, customer: any): Promise<void> {
+    const productSummary = (order.items || [])
+      .map((it: any) => `${it.productName || it.product?.name} (${it.quantity}টি)`)
+      .join(', ');
+
+    const sheetRow = {
+      orderId: order.id,
+      consignmentId: order.consignmentId || 'Pending',
+      trackingCode: order.trackingCode || 'Pending',
+      dateTime: new Date(order.createdAt || Date.now()).toISOString(),
+      customerName: customer.name || 'N/A',
+      phoneNumber: customer.phone || 'N/A',
+      district: customer.district || 'N/A',
+      thana: customer.thana || 'N/A',
+      deliveryAddress: customer.fullAddress || 'N/A',
+      orderedProducts: productSummary,
+      productTotal: order.productTotal,
+      deliveryCharge: order.deliveryCharge,
+      totalPayable: order.totalAmount,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      transactionId: order.transactionId || 'N/A',
+      courierStatus: order.consignmentId ? 'Booked' : 'Pending',
+      orderStatus: order.orderStatus,
+      sourceChannel: order.sourceChannel,
+      customerId: customer.id,
+    };
+
+    console.log(`📊 [Google Sheet Backup] Queuing row for Order ${order.id}...`);
+
+    if (config.meta.n8nWebhookUrl) {
+      try {
+        await axios.post(
+          config.meta.n8nWebhookUrl,
+          {
+            event: 'GOOGLE_SHEET_BACKUP',
+            row: sheetRow,
+            timestamp: new Date().toISOString(),
+          },
+          { timeout: 5000 },
+        );
+        console.log(`✅ [Google Sheet Backup] Order ${order.id} synced via n8n.`);
+      } catch (err: any) {
+        console.warn('⚠️ [OrderAlerts] Failed to sync Google Sheet webhook to n8n:', err?.message || err);
       }
     }
   },

@@ -19,6 +19,8 @@ router.get(
   OrderControllers.getOrderById,
 );
 
+router.get('/:id/invoice', OrderControllers.getInvoice);
+
 router.post(
   '/',
   validateRequest(OrderValidations.createOrderZodSchema),

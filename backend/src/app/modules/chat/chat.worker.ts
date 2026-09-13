@@ -6,6 +6,7 @@ import { extractCustomerAndCartEntities } from '../customer/customer.extractor';
 import { CustomerServices } from '../customer/customer.service';
 import { CustomerSession } from '../customer/customer.session';
 import { OrderServices } from '../order/order.service';
+import { CourierServices } from '../courier/courier.service';
 import { AiAgent } from './ai.agent';
 import type { IProcessMessageJob } from './chat.interface';
 import { ChatServices } from './chat.service';
@@ -124,7 +125,18 @@ export const setupChatWorker = () => {
               sourceChannel: conversation.channel,
             });
 
-            aiReply = `✅ আপনার অর্ডারটি সফলভাবে Confirm করা হয়েছে!\n\n📦 Order ID: ${order.id}\n💰 মোট Payable: ৳${order.totalAmount} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nআমাদের পক্ষ থেকে পার্সেলটি দ্রুত কুরিয়ারে হস্তান্তর করা হবে। Royal Honey BD-এর সাথে থাকার জন্য ধন্যবাদ ❤️`;
+            // Phase 5: Auto-book parcel in courier
+            let trackingInfo = '';
+            try {
+              const booked = await CourierServices.bookOrderParcel(order.id);
+              if (booked.trackingCode) {
+                trackingInfo = `\n🚚 কুরিয়ার ট্র্যাকিং কোড: ${booked.trackingCode} (${booked.courierProvider || 'Steadfast'})`;
+              }
+            } catch (courierErr) {
+              console.warn('⚠️ Auto courier booking failed:', courierErr);
+            }
+
+            aiReply = `✅ আপনার অর্ডারটি সফলভাবে Confirm করা হয়েছে!\n\n📦 Order ID: ${order.id}${trackingInfo}\n💰 মোট Payable: ৳${order.totalAmount} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nআমাদের পক্ষ থেকে পার্সেলটি দ্রুত কুরিয়ারে হস্তান্তর করা হবে। Royal Honey BD-এর সাথে থাকার জন্য ধন্যবাদ ❤️`;
           } catch (err: any) {
             console.error('❌ Order placement failed for COD:', err?.message || err);
             aiReply = `দুঃখিত! ${err?.message || 'অর্ডার সম্পন্ন করা সম্ভব হয়নি।'} অনুগ্রহ করে হেল্পলাইনে যোগাযোগ করুন।`;

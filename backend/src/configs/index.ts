@@ -38,6 +38,13 @@ const config = {
     whatsappPhoneId: getEnvVar('WHATSAPP_PHONE_NUMBER_ID', ''),
     n8nWebhookUrl: getEnvVar('N8N_OUTGOING_WEBHOOK_URL', ''),
   },
+  courier: {
+    provider: getEnvVar('COURIER_PROVIDER', 'STEADFAST'),
+    mode: (getEnvVar('STEADFAST_MODE', 'sandbox') || 'sandbox') as 'sandbox' | 'production',
+    apiKey: getEnvVar('STEADFAST_API_KEY', ''),
+    secretKey: getEnvVar('STEADFAST_SECRET_KEY', ''),
+    baseUrl: getEnvVar('STEADFAST_BASE_URL', 'https://portal.steadfast.com.bd/api/v1'),
+  },
   urls: {
     frontend_url: getEnvVar('FRONTEND_URL', 'http://localhost:3000'),
     backend_url: getEnvVar('BACKEND_URL', 'http://localhost:5000'),

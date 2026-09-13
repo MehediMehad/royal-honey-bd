@@ -474,6 +474,37 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
+              {/* Payment Proof Screenshot Preview (Phase 8: Multi-Modal Vision OCR) */}
+              {verifyingOrder.paymentProofUrl && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                  <div className="flex justify-between items-center text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                    <span className="flex items-center gap-1.5">
+                      <span>📸 কাস্টমারের পাঠানো পেমেন্ট স্ক্রিনশট</span>
+                    </span>
+                    <a
+                      href={verifyingOrder.paymentProofUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline text-[10px]"
+                    >
+                      পূর্ণাঙ্গ ছবি দেখুন ↗
+                    </a>
+                  </div>
+                  <div className="overflow-hidden rounded-lg border border-border/80 max-h-48 flex justify-center bg-black/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={verifyingOrder.paymentProofUrl}
+                      alt="Customer Payment Proof Screenshot"
+                      className="object-contain max-h-48 w-auto hover:scale-105 transition-transform cursor-pointer"
+                      onClick={() =>
+                        verifyingOrder.paymentProofUrl &&
+                        window.open(verifyingOrder.paymentProofUrl, "_blank")
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-muted-foreground">
                   Verification Note (Optional)

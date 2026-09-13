@@ -1,5 +1,6 @@
 import { Worker, type Job } from 'bullmq';
-import { ConversationStatus, PaymentMethod, MessageType } from '@prisma/client';
+import { ConversationStatus, PaymentMethod, MessageType, OrderStatus } from '@prisma/client';
+import prisma from '../../libs/prisma';
 import { CHAT_QUEUE_NAME, redisConnection } from '../../libs/queue';
 import { CartServices } from '../cart/cart.service';
 import { extractCustomerAndCartEntities } from '../customer/customer.extractor';
@@ -8,6 +9,9 @@ import { CustomerSession } from '../customer/customer.session';
 import { OrderServices } from '../order/order.service';
 import { CourierServices } from '../courier/courier.service';
 import { VoiceServices } from '../voice/voice.service';
+import { VisionServices } from '../vision/vision.service';
+import { ProductServices } from '../products/product.service';
+import { OrderAlerts } from '../order/order.alert';
 import { AiAgent } from './ai.agent';
 import type { IProcessMessageJob } from './chat.interface';
 import { ChatServices } from './chat.service';
@@ -29,8 +33,14 @@ export const setupChatWorker = () => {
         mediaType === 'AUDIO' ||
         (mediaUrl && !!mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i));
 
+      // 2.1 Detect & Analyze Images (Phase 8: Multi-Modal Vision & Payment OCR)
+      const isImageMessage =
+        mediaType === 'IMAGE' ||
+        (mediaUrl && !isVoiceMessage && !mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i));
+
       let processedText = content;
       let isAmbiguousVoice = false;
+      let visionResult: any = null;
 
       if (isVoiceMessage && mediaUrl) {
         console.log(`🎙️ [ChatWorker] Transcribing customer voice message from ${mediaUrl}...`);
@@ -68,10 +78,31 @@ export const setupChatWorker = () => {
             MessageType.AUDIO,
           );
         }
+      } else if (isImageMessage && mediaUrl) {
+        console.log(`🖼️ [ChatWorker] Analyzing customer image via Vision LLM from ${mediaUrl}...`);
+        try {
+          visionResult = await VisionServices.analyzeCustomerImage({ imageUrl: mediaUrl });
+          console.log(`👁️ [ChatWorker] Vision classification: ${visionResult.imageCategory} (Confidence: ${visionResult.confidence})`);
+
+          await ChatServices.saveCustomerMessage(
+            conversation.id,
+            content || `[ছবি পাঠানো হয়েছে: ${visionResult.description || visionResult.imageCategory}]`,
+            mediaUrl,
+            MessageType.IMAGE,
+            { vision: visionResult },
+          );
+        } catch (imgErr: any) {
+          console.error('❌ [ChatWorker] Image analysis error:', imgErr?.message || imgErr);
+          await ChatServices.saveCustomerMessage(
+            conversation.id,
+            content || '[ছবি পাঠানো হয়েছে]',
+            mediaUrl,
+            MessageType.IMAGE,
+          );
+        }
       } else {
-        // Save normal text or image customer message
-        const msgType = mediaType === 'IMAGE' ? MessageType.IMAGE : undefined;
-        await ChatServices.saveCustomerMessage(conversation.id, content, mediaUrl, msgType);
+        // Save normal text message
+        await ChatServices.saveCustomerMessage(conversation.id, content, undefined, MessageType.TEXT);
       }
 
       // 3. Check if human agent has taken over
@@ -86,7 +117,7 @@ export const setupChatWorker = () => {
         };
       }
 
-      // 3.1 If voice message is ambiguous or silent, politely ask customer to re-send
+      // 3.1 Ambiguous or silent voice clarification
       if (isAmbiguousVoice) {
         const clarifyReply =
           'দুঃখিত! আপনার ভয়েস মেসেজটি স্পষ্ট বোঝা যায়নি। অনুগ্রহ করে একটু স্পষ্ট করে আবার ভয়েস পাঠান অথবা লিখে জানান ❤️';
@@ -99,11 +130,88 @@ export const setupChatWorker = () => {
         };
       }
 
+      // 3.2 Vision Branch: Damaged Jar / Packaging Complaint (Section 30)
+      if (visionResult?.imageCategory === 'COMPLAINT_DAMAGE') {
+        const damageReply =
+          'আপনার পাঠানো ছবিটি আমরা দেখেছি। পার্সেল ক্ষতিগ্রস্ত বা ভাঙা হওয়ার জন্য আমরা আন্তরিকভাবে দুঃখিত!\n\nRoyal Honey BD-এর নিয়ম অনুযায়ী ডেলিভারিতে পার্সেল বা বয়াম ক্ষতিগ্রস্ত হলে আমরা সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দিই।\n\nবিষয়টি এখনই অগ্রাধিকার ভিত্তিতে আমাদের সাপোর্ট টিম ও ওনারের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের একজন প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।\n\nজরুরি প্রয়োজনে হেল্পলাইনেও সরাসরি যোগাযোগ করতে পারেন: 01604121107 ❤️';
+
+        await ChatServices.takeoverConversation(conversation.id);
+        await ChatServices.saveAiMessage(conversation.id, damageReply);
+        await MessageSender.dispatchReply(channel, channelId, damageReply);
+        return {
+          status: 'completed',
+          reason: 'damage_complaint_handoff',
+          conversationId: conversation.id,
+        };
+      }
+
+      // 3.3 Vision Branch: Unclear / Blurry Image
+      if (visionResult?.imageCategory === 'UNCLEAR') {
+        const unclearReply =
+          'আপনার পাঠানো ছবিটি পরিষ্কারভাবে বোঝা যাচ্ছে না। অনুগ্রহ করে একটু স্পষ্ট ছবি অথবা আপনি কী জানতে বা অর্ডার করতে চান তা লিখে জানান ❤️';
+        await ChatServices.saveAiMessage(conversation.id, unclearReply);
+        await MessageSender.dispatchReply(channel, channelId, unclearReply);
+        return {
+          status: 'completed',
+          reason: 'unclear_image_reply',
+          conversationId: conversation.id,
+        };
+      }
+
+      // 3.4 Vision Branch: Product Inquiry via Photo (Product Catalog Matching)
+      if (visionResult?.imageCategory === 'PRODUCT_INQUIRY') {
+        const prodId = visionResult.productMatch?.matchedProductId;
+        let prodName = visionResult.productMatch?.productName || 'আমাদের খাঁটি মধু';
+        let prodPrice = 200;
+        let prodWeight = '250 গ্রাম';
+        let prodDesc = '';
+
+        if (prodId) {
+          try {
+            const prod = await ProductServices.getProductById(prodId);
+            if (prod) {
+              prodName = prod.name;
+              prodPrice = prod.price;
+              prodWeight = prod.weight;
+              prodDesc = prod.description || '';
+            }
+          } catch { }
+        }
+
+        const prodReply = `ধন্যবাদ! ছবিতে প্রদর্শিত পণ্যটি আমাদের "${prodName}" (${prodWeight})।\n\n💰 মূল্য: ৳${prodPrice}\n${prodDesc ? `📝 বিবরণ: ${prodDesc}\n` : ''}🚚 ডেলিভারি চার্জ: ঢাকা ৬০৳ / ঢাকার বাইরে ১২০৳\n\nআপনি কি এটি অর্ডার করতে চান? কতটি জার লাগবে এবং আপনার ডেলিভারি ঠিকানা জানাবেন ❤️`;
+
+        await ChatServices.saveAiMessage(conversation.id, prodReply);
+        await MessageSender.dispatchReply(channel, channelId, prodReply);
+        return {
+          status: 'completed',
+          reason: 'product_inquiry_from_image',
+          conversationId: conversation.id,
+        };
+      }
+
       // 4. Hydrate Customer Session (Redis Cache + PostgreSQL fallback)
       let session = await CustomerSession.getSession(customer.id);
 
+      // 4.1 Vision Branch: Address Proof (Handwritten / Typed screenshot extraction)
+      if (visionResult?.imageCategory === 'ADDRESS_PROOF' && visionResult.addressData) {
+        session = await CustomerServices.updateCustomerProfile(
+          customer.id,
+          visionResult.addressData,
+        );
+      }
+
       // 5. Extract Customer Details, Cart Actions, Payment Method & Confirmation Intent via OpenAI
       const extracted = await extractCustomerAndCartEntities(processedText);
+
+      // If vision detected payment proof, merge payment fields
+      if (visionResult?.imageCategory === 'PAYMENT_PROOF' && visionResult.paymentData) {
+        if (visionResult.paymentData.transactionId) {
+          extracted.transactionId = visionResult.paymentData.transactionId;
+        }
+        if (visionResult.paymentData.paymentMethod) {
+          extracted.paymentMethod = visionResult.paymentData.paymentMethod;
+        }
+      }
 
       // 6. Apply Customer Profile Updates (Name, Phone, Address, District)
       if (extracted.customerInfo && Object.keys(extracted.customerInfo).length > 0) {
@@ -147,25 +255,74 @@ export const setupChatWorker = () => {
 
       let aiReply = '';
 
-      // 8. Phase 4: Atomic Order Placement Workflow
+      // 8. Phase 4 & Phase 8: Atomic Order & Payment Proof OCR Handling
       const hasAllDetails = session.missingFields.length === 0 && session.cart.items.length > 0;
+      const isPaymentProof = visionResult?.imageCategory === 'PAYMENT_PROOF' || !!extracted.transactionId;
 
-      // Case 8.1: Customer submits Advance Payment Transaction ID (TrxID)
-      if (hasAllDetails && extracted.transactionId) {
+      // Case 8.0: Customer has already placed an order awaiting payment, and now sends screenshot
+      const existingPendingOrder = await prisma.order.findFirst({
+        where: {
+          customerId: customer.id,
+          orderStatus: OrderStatus.PAYMENT_VERIFICATION_PENDING,
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { customer: true, items: true },
+      });
+
+      if (existingPendingOrder && isPaymentProof) {
+        const detectedTrxId =
+          extracted.transactionId ||
+          visionResult?.paymentData?.transactionId ||
+          existingPendingOrder.transactionId ||
+          'স্ক্রিনশট প্রদান করা হয়েছে';
+
+        const updatedOrder = await prisma.order.update({
+          where: { id: existingPendingOrder.id },
+          data: {
+            transactionId: detectedTrxId,
+            paymentProofUrl: mediaUrl || existingPendingOrder.paymentProofUrl,
+            paymentMethod:
+              extracted.paymentMethod === 'NAGAD' ? PaymentMethod.NAGAD : PaymentMethod.BKASH,
+          },
+          include: { customer: true, items: true },
+        });
+
+        // Trigger owner alert with screenshot preview
+        OrderAlerts.sendAdvancePaymentAlert(updatedOrder, updatedOrder.customer).catch((err) =>
+          console.error('Error in sendAdvancePaymentAlert:', err),
+        );
+
+        const amountStr = visionResult?.paymentData?.amount
+          ? `\n💰 এক্সট্র্যাক্ট করা অ্যামাউন্ট: ৳${visionResult.paymentData.amount}`
+          : '';
+
+        aiReply = `আপনার পেমেন্টের স্ক্রিনশট আমরা পেয়েছি।\n\n📌 ট্রানজেকশন আইডি (TrxID): ${detectedTrxId}${amountStr}\n\nআমাদের অ্যাকাউন্টস টিম স্টেটমেন্টের সাথে পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${updatedOrder.id}\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
+      }
+      // Case 8.1: Customer submits Advance Payment Transaction ID (TrxID) or payment screenshot with active cart
+      else if (hasAllDetails && isPaymentProof) {
         try {
           const method =
             extracted.paymentMethod === 'NAGAD' ? PaymentMethod.NAGAD : PaymentMethod.BKASH;
+          const detectedTrxId =
+            extracted.transactionId ||
+            visionResult?.paymentData?.transactionId ||
+            'স্ক্রিনশট প্রদান করা হয়েছে';
+
           const order = await OrderServices.createAtomicOrder({
             customerId: customer.id,
             paymentMethod: method,
-            transactionId: extracted.transactionId,
+            transactionId: detectedTrxId,
             paymentProofUrl: mediaUrl || undefined,
             sourceChannel: conversation.channel,
           });
 
-          aiReply = `আপনার পেমেন্টের তথ্য (TrxID: ${extracted.transactionId}) আমরা পেয়েছি।\n\nআমাদের অ্যাকাউন্টস টিম পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${order.id}\n💰 মোট প্রদেয়: ৳${order.totalAmount}\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
+          const amountStr = visionResult?.paymentData?.amount
+            ? `\n💰 এক্সট্র্যাক্ট করা অ্যামাউন্ট: ৳${visionResult.paymentData.amount}`
+            : '';
+
+          aiReply = `আপনার পেমেন্টের তথ্য (TrxID: ${detectedTrxId}) আমরা পেয়েছি।${amountStr}\n\nআমাদের অ্যাকাউন্টস টিম পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${order.id}\n💰 মোট প্রদেয়: ৳${order.totalAmount}\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
         } catch (err: any) {
-          console.error('❌ Order placement failed with TrxID:', err?.message || err);
+          console.error('❌ Order placement failed with TrxID/Screenshot:', err?.message || err);
           aiReply = `দুঃখিত! ${err?.message || 'অর্ডার সম্পন্ন করা সম্ভব হয়নি।'} অনুগ্রহ করে আমাদের হেল্পলাইনে (01604121107) যোগাযোগ করুন।`;
         }
       }
@@ -176,7 +333,7 @@ export const setupChatWorker = () => {
           (extracted.paymentMethod === 'BKASH' || extracted.paymentMethod === 'NAGAD') &&
           !extracted.transactionId
         ) {
-          aiReply = `ধন্যবাদ ${session.name || ''}! অনুগ্রহ করে আমাদের ${extracted.paymentMethod === 'NAGAD' ? 'নগদ' : 'বিকাশ'} নম্বরে মোট ৳${session.cart.finalTotal} পাঠিয়ে TrxID অথবা পেমেন্টের স্ক্রিনশট দিন:\n\n📱 বিকাশ / নগদ (Personal): 01604121107\n💰 মোট প্রদেয়: ৳${session.cart.finalTotal}\n\nটাকা পাঠিয়ে TrxID লিখলেই সাথে সাথে আপনার অর্ডারটি ভেরিফিকেশন ও কনফার্মেশনের জন্য গ্রহণ করা হবে।`;
+          aiReply = `ধন্যবাদ ${session.name || ''}! অনুগ্রহ করে আমাদের ${extracted.paymentMethod === 'NAGAD' ? 'নগদ' : 'বিকাশ'} নম্বরে মোট ৳${session.cart.finalTotal} পাঠিয়ে TrxID অথবা পেমেন্টের স্ক্রিনশট দিন:\n\n📱 বিকাশ / নগদ (Personal): 01604121107\n💰 মোট প্রদেয়: ৳${session.cart.finalTotal}\n\nটাকা পাঠিয়ে TrxID লিখলেই বা স্ক্রিনশট দিলেই সাথে সাথে আপনার অর্ডারটি ভেরিফিকেশন ও কনফার্মেশনের জন্য গ্রহণ করা হবে।`;
         } else {
           // Cash on Delivery (COD) order confirmation
           try {
@@ -209,7 +366,7 @@ export const setupChatWorker = () => {
       if (!aiReply) {
         const history = await ChatServices.getRecentConversationHistory(conversation.id, 8);
         aiReply = await AiAgent.generateCustomerReply(
-          content,
+          processedText,
           customer.name,
           history,
           session,

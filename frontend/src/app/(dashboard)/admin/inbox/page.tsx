@@ -10,7 +10,6 @@ import {
   RotateCcw,
   Search,
   Phone,
-  Clock,
   Sparkles,
   Loader2,
   Mic,
@@ -481,6 +480,24 @@ export default function AdminInboxPage() {
                           )}
                         </div>
                       )}
+
+                      {/* Image Thumbnail Widget if Image Message (Phase 8: Multi-Modal Vision) */}
+                      {(msg.messageType === "IMAGE" ||
+                        (msg.mediaUrl &&
+                          msg.mediaUrl.match(/\.(jpg|jpeg|png|webp|gif)/i))) &&
+                        msg.mediaUrl && (
+                          <div className="mb-2 overflow-hidden rounded-xl border border-border/80 max-w-xs bg-black/5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={msg.mediaUrl}
+                              alt="Customer image"
+                              className="max-h-52 w-auto object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                              onClick={() =>
+                                msg.mediaUrl && window.open(msg.mediaUrl, "_blank")
+                              }
+                            />
+                          </div>
+                        )}
 
                       <div className="flex items-start gap-1.5">
                         {msg.messageType === "AUDIO" && (

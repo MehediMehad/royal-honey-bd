@@ -67,4 +67,15 @@ export const API_ENDPOINTS = {
     RESUME_AI: (id: string) => `/chat/conversations/${id}/resume-ai`,
     REPLY: (id: string) => `/chat/conversations/${id}/reply`,
   },
+  ANALYTICS: {
+    OVERVIEW: (timeframe?: string) =>
+      `/analytics/overview${timeframe ? `?timeframe=${timeframe}` : ""}`,
+    DLQ: "/analytics/dlq",
+    DLQ_RETRY: (jobId: string) => `/analytics/dlq/retry/${jobId}`,
+    DLQ_RETRY_ALL: "/analytics/dlq/retry-all",
+    DLQ_CLEAN: "/analytics/dlq/clean",
+    ABANDONED_CARTS: "/analytics/abandoned-carts",
+    ABANDONED_TRIGGER: "/analytics/abandoned-carts/trigger",
+  },
 } as const;
+

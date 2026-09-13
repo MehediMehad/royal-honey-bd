@@ -70,15 +70,16 @@ services:
     networks:
       - royal_honey_net
 
-  worker:
+  worker-ai:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: royal_honey_prod_worker
+    container_name: royal_honey_prod_worker_ai
     restart: always
     command: ["node", "dist/worker.js"]
     environment:
       NODE_ENV: production
+      WORKER_ROLE: ai
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-Mehedi0610}@postgres:5432/${POSTGRES_DB:-royal_honey_db}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -88,6 +89,31 @@ services:
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
       STEADFAST_API_KEY: ${STEADFAST_API_KEY}
       STEADFAST_SECRET_KEY: ${STEADFAST_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - royal_honey_net
+
+  worker-media:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: royal_honey_prod_worker_media
+    restart: always
+    command: ["node", "dist/worker.js"]
+    environment:
+      NODE_ENV: production
+      WORKER_ROLE: media
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-Mehedi0610}@postgres:5432/${POSTGRES_DB:-royal_honey_db}?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
     depends_on:
       postgres:
         condition: service_healthy

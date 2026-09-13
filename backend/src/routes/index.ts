@@ -10,6 +10,7 @@ import { WebhookRoutes } from '../app/modules/webhook/webhook.route';
 import { VoiceRoutes } from '../app/modules/voice/voice.route';
 import { VisionRoutes } from '../app/modules/vision/vision.route';
 import { VideoRoutes } from '../app/modules/video/video.route';
+import { AnalyticsRoutes } from '../app/modules/analytics/analytics.route';
 
 const router = express.Router();
 
@@ -21,6 +22,10 @@ const moduleRoutes = [
   {
     path: '/admin',
     route: DashboardRoutes,
+  },
+  {
+    path: '/analytics',
+    route: AnalyticsRoutes,
   },
   {
     path: '/chat',

@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   Boxes,
   Bot,
+  BarChart3,
   LogOut,
   Loader2,
   AlertTriangle,
@@ -34,6 +35,12 @@ const royalHoneyNavItems = [
     href: "/admin",
     icon: LayoutDashboard,
     badge: null,
+  },
+  {
+    title: "Analytics & Growth",
+    href: "/admin/analytics",
+    icon: BarChart3,
+    badge: "BI",
   },
   {
     title: "Live Chat & Takeover",

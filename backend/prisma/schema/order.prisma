@@ -1,8 +1,9 @@
 model Cart {
-  id         String   @id @default(uuid())
-  customerId String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                      String    @id @default(uuid())
+  customerId              String
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  abandonedFollowupSentAt DateTime?
 
   customer Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
   items    CartItem[]

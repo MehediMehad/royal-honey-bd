@@ -4,3 +4,5 @@ export * from "./order.service";
 export * from "./chat.service";
 export * from "./inventory.service";
 export * from "./knowledge.service";
+export * from "./analytics.service";
+

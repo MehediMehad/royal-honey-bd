@@ -89,8 +89,19 @@ const saveCustomerMessage = async (
   conversationId: string,
   content: string,
   mediaUrl?: string,
+  messageType?: MessageType,
+  metadata?: any,
 ) => {
-  const msgType = mediaUrl ? MessageType.IMAGE : MessageType.TEXT;
+  let msgType = messageType;
+  if (!msgType) {
+    if (mediaUrl) {
+      msgType = mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i)
+        ? MessageType.AUDIO
+        : MessageType.IMAGE;
+    } else {
+      msgType = MessageType.TEXT;
+    }
+  }
 
   const [message] = await prisma.$transaction([
     prisma.message.create({
@@ -100,6 +111,7 @@ const saveCustomerMessage = async (
         messageType: msgType,
         content,
         mediaUrl: mediaUrl || null,
+        metadata: metadata || null,
       },
     }),
     prisma.conversation.update({

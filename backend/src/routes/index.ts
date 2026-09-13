@@ -7,6 +7,7 @@ import { CourierRoutes } from '../app/modules/courier/courier.route';
 import { ChatRoutes } from '../app/modules/chat/chat.route';
 import { DashboardRoutes } from '../app/modules/admin/dashboard.route';
 import { WebhookRoutes } from '../app/modules/webhook/webhook.route';
+import { VoiceRoutes } from '../app/modules/voice/voice.route';
 
 const router = express.Router();
 
@@ -42,6 +43,10 @@ const moduleRoutes = [
   {
     path: '/webhook',
     route: WebhookRoutes,
+  },
+  {
+    path: '/voice',
+    route: VoiceRoutes,
   },
 ];
 

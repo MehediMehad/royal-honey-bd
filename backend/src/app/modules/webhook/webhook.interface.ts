@@ -5,6 +5,7 @@ export interface INormalizedIncomingMessage {
   content: string;
   senderName?: string;
   mediaUrl?: string;
+  mediaType?: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO';
   timestamp?: number;
 }
 
@@ -23,5 +24,7 @@ export interface IMetaWebhookPayload {
   messageId?: string;
   content?: string;
   senderName?: string;
+  mediaUrl?: string;
+  mediaType?: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO';
 }
 

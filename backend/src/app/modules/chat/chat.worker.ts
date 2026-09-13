@@ -1,5 +1,5 @@
 import { Worker, type Job } from 'bullmq';
-import { ConversationStatus, PaymentMethod } from '@prisma/client';
+import { ConversationStatus, PaymentMethod, MessageType } from '@prisma/client';
 import { CHAT_QUEUE_NAME, redisConnection } from '../../libs/queue';
 import { CartServices } from '../cart/cart.service';
 import { extractCustomerAndCartEntities } from '../customer/customer.extractor';
@@ -7,6 +7,7 @@ import { CustomerServices } from '../customer/customer.service';
 import { CustomerSession } from '../customer/customer.session';
 import { OrderServices } from '../order/order.service';
 import { CourierServices } from '../courier/courier.service';
+import { VoiceServices } from '../voice/voice.service';
 import { AiAgent } from './ai.agent';
 import type { IProcessMessageJob } from './chat.interface';
 import { ChatServices } from './chat.service';
@@ -16,15 +17,62 @@ export const setupChatWorker = () => {
   const worker = new Worker(
     CHAT_QUEUE_NAME,
     async (job: Job<IProcessMessageJob>) => {
-      const { channel, channelId, content, mediaUrl } = job.data;
-      console.log(`📥 [ChatWorker] Processing message from ${channel}:${channelId}`);
+      const { channel, channelId, content, mediaUrl, mediaType } = job.data;
+      console.log(`📥 [ChatWorker] Processing message from ${channel}:${channelId} (Type: ${mediaType || 'TEXT'})`);
 
       // 1. Identify/Create Customer and Conversation
       const { customer, conversation } =
         await ChatServices.getOrCreateCustomerAndConversation(job.data);
 
-      // 2. Save incoming customer message
-      await ChatServices.saveCustomerMessage(conversation.id, content, mediaUrl);
+      // 2. Detect & Transcribe Voice Messages (Phase 7: Bangla STT)
+      const isVoiceMessage =
+        mediaType === 'AUDIO' ||
+        (mediaUrl && !!mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i));
+
+      let processedText = content;
+      let isAmbiguousVoice = false;
+
+      if (isVoiceMessage && mediaUrl) {
+        console.log(`🎙️ [ChatWorker] Transcribing customer voice message from ${mediaUrl}...`);
+        try {
+          const transcriptionResult = await VoiceServices.transcribeBanglaAudio({
+            audioUrl: mediaUrl,
+            channel,
+          });
+
+          if (transcriptionResult.isAmbiguous || !transcriptionResult.text.trim()) {
+            console.warn('⚠️ [ChatWorker] Audio transcription is silent or ambiguous');
+            isAmbiguousVoice = true;
+            processedText = '[অস্পষ্ট বা নিরব ভয়েস মেসেজ]';
+          } else {
+            processedText = transcriptionResult.text;
+            console.log(`📝 [ChatWorker] Transcribed Bangla Voice: "${processedText}"`);
+          }
+
+          // Save customer message as AUDIO with transcription
+          await ChatServices.saveCustomerMessage(
+            conversation.id,
+            processedText,
+            mediaUrl,
+            MessageType.AUDIO,
+            { transcription: processedText, provider: transcriptionResult.provider },
+          );
+        } catch (voiceErr: any) {
+          console.error('❌ [ChatWorker] Voice transcription error:', voiceErr?.message || voiceErr);
+          isAmbiguousVoice = true;
+          processedText = '[ভয়েস মেসেজ প্রসেসিং ত্রুটি]';
+          await ChatServices.saveCustomerMessage(
+            conversation.id,
+            processedText,
+            mediaUrl,
+            MessageType.AUDIO,
+          );
+        }
+      } else {
+        // Save normal text or image customer message
+        const msgType = mediaType === 'IMAGE' ? MessageType.IMAGE : undefined;
+        await ChatServices.saveCustomerMessage(conversation.id, content, mediaUrl, msgType);
+      }
 
       // 3. Check if human agent has taken over
       if (conversation.status === ConversationStatus.HUMAN_TAKEOVER) {
@@ -38,11 +86,24 @@ export const setupChatWorker = () => {
         };
       }
 
+      // 3.1 If voice message is ambiguous or silent, politely ask customer to re-send
+      if (isAmbiguousVoice) {
+        const clarifyReply =
+          'দুঃখিত! আপনার ভয়েস মেসেজটি স্পষ্ট বোঝা যায়নি। অনুগ্রহ করে একটু স্পষ্ট করে আবার ভয়েস পাঠান অথবা লিখে জানান ❤️';
+        await ChatServices.saveAiMessage(conversation.id, clarifyReply);
+        await MessageSender.dispatchReply(channel, channelId, clarifyReply);
+        return {
+          status: 'completed',
+          reason: 'ambiguous_voice_clarification_sent',
+          conversationId: conversation.id,
+        };
+      }
+
       // 4. Hydrate Customer Session (Redis Cache + PostgreSQL fallback)
       let session = await CustomerSession.getSession(customer.id);
 
       // 5. Extract Customer Details, Cart Actions, Payment Method & Confirmation Intent via OpenAI
-      const extracted = await extractCustomerAndCartEntities(content);
+      const extracted = await extractCustomerAndCartEntities(processedText);
 
       // 6. Apply Customer Profile Updates (Name, Phone, Address, District)
       if (extracted.customerInfo && Object.keys(extracted.customerInfo).length > 0) {

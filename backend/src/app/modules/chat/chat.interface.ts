@@ -7,6 +7,7 @@ export interface IProcessMessageJob {
   content: string;
   senderName?: string;
   mediaUrl?: string;
+  mediaType?: 'TEXT' | 'IMAGE' | 'AUDIO' | 'VIDEO';
   timestamp?: number;
 }
 

@@ -13,6 +13,7 @@ import {
   Clock,
   Sparkles,
   Loader2,
+  Mic,
 } from "lucide-react";
 import { chatService } from "@/services/chat.service";
 import { getSocket } from "@/lib/socket";
@@ -462,7 +463,33 @@ export default function AdminInboxPage() {
                             : "bg-amber-500 text-white font-medium"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      {/* Audio Player Widget if Voice Message */}
+                      {(msg.messageType === "AUDIO" ||
+                        (msg.mediaUrl &&
+                          msg.mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i))) && (
+                        <div className="mb-2 p-2 rounded-xl bg-muted/60 border border-border/50">
+                          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-600 mb-1">
+                            <Mic className="size-3 text-amber-500 animate-pulse" />
+                            <span>কাস্টমার ভয়েস মেসেজ</span>
+                          </div>
+                          {msg.mediaUrl && (
+                            <audio
+                              controls
+                              src={msg.mediaUrl}
+                              className="w-full h-8 max-w-xs mt-1"
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-1.5">
+                        {msg.messageType === "AUDIO" && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold uppercase shrink-0">
+                            ভয়েস টেক্সট
+                          </span>
+                        )}
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
                     </div>
                   </div>
                 );

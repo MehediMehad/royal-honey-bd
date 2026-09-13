@@ -3,7 +3,7 @@ import config from '../../../configs';
 import type { ILowStockAlertItem } from './order.interface';
 
 /**
- * Dispatch outgoing alerts to Business Owner via Console, Socket (future), & n8n Webhook (WhatsApp / Sheet)
+ * Dispatch outgoing alerts to Business Owner via Console, Socket.io, & n8n Webhook (WhatsApp / Sheet)
  */
 export const OrderAlerts = {
   /**
@@ -22,6 +22,21 @@ export const OrderAlerts = {
 ড্যাশবোর্ড লিংক: ${config.urls.frontend_url}/admin/inventory
 ============================================================
 `);
+    }
+
+    // Emit real-time socket alert to admin dashboard
+    try {
+      const { emitSocketEvent } = await import('../../libs/socket');
+      for (const item of alerts) {
+        emitSocketEvent('inventory:low_stock', {
+          productId: item.productId,
+          productName: item.productName,
+          remainingStock: item.remainingStock,
+          minThreshold: item.minThreshold,
+        });
+      }
+    } catch (socketErr) {
+      console.warn('⚠️ [Socket.io] Failed to emit low stock alert:', socketErr);
     }
 
     // Outgoing webhook to n8n for WhatsApp alert to business owner
@@ -51,13 +66,26 @@ export const OrderAlerts = {
     console.log(`
 ⚠️ ============= ADVANCE PAYMENT VERIFICATION NEEDED ============= ⚠️
 অর্ডার আইডি: ${order.id}
-গ্রাহক: ${customer.name} (${customer.phone})
+গ্রাহক: ${customer?.name} (${customer?.phone})
 পেমেন্ট মেথড: ${order.paymentMethod}
 মোট প্রদেয়: ৳${order.totalAmount}
 কাস্টমার TrxID: ${order.transactionId || 'স্ক্রিনশট প্রদান করা হয়েছে'}
 যাচাই ও কনফার্ম লিংক: ${verifyUrl}
 ==================================================================
 `);
+
+    // Emit real-time socket alert to admin dashboard
+    try {
+      const { emitSocketEvent } = await import('../../libs/socket');
+      emitSocketEvent('payment:pending', {
+        orderId: order.id,
+        trxId: order.transactionId,
+        customerName: customer?.name || 'Customer',
+        totalAmount: order.totalAmount,
+      });
+    } catch (socketErr) {
+      console.warn('⚠️ [Socket.io] Failed to emit advance payment alert:', socketErr);
+    }
 
     if (config.meta.n8nWebhookUrl) {
       try {
@@ -66,8 +94,8 @@ export const OrderAlerts = {
           {
             event: 'ADVANCE_PAYMENT_PENDING',
             orderId: order.id,
-            customerName: customer.name,
-            customerPhone: customer.phone,
+            customerName: customer?.name,
+            customerPhone: customer?.phone,
             paymentMethod: order.paymentMethod,
             totalAmount: order.totalAmount,
             transactionId: order.transactionId,
@@ -88,20 +116,33 @@ export const OrderAlerts = {
    */
   async sendOrderConfirmedAlert(order: any, customer: any): Promise<void> {
     const courierInfo = order.trackingCode
-      ? `কুরিয়ার ট্র্যাকিং: ${order.trackingCode} (${order.courierProvider || 'Steadfast'})\nট্র্যাকিং লিংক: https://steadfast.com.bd/t/${order.trackingCode}`
+      ? `কুরিয়ার ট্র্যাকিং: ${order.trackingCode} (${order.courierProvider || 'Steadfast'})\n트্যাকিং লিংক: https://steadfast.com.bd/t/${order.trackingCode}`
       : 'কুরিয়ার বুকিং: প্রক্রিয়াধীন (Pending Booking)';
 
     console.log(`
 🛒 ==================== NEW ORDER CONFIRMED ==================== 🛒
 অর্ডার আইডি: ${order.id}
-গ্রাহক: ${customer.name} (${customer.phone})
-ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}
+গ্রাহক: ${customer?.name} (${customer?.phone})
+ডেলিভারি ঠিকানা: ${customer?.fullAddress}, ${customer?.district}
 মোট প্রদেয়: ৳${order.totalAmount} (${order.paymentMethod})
 ${courierInfo}
 আইটেম সংখ্যা: ${order.items?.length || 0}
 ড্যাশবোর্ড ভিউ: ${config.urls.frontend_url}/orders/${order.id}
 ================================================================
 `);
+
+    // Emit real-time socket alert to admin dashboard
+    try {
+      const { emitSocketEvent } = await import('../../libs/socket');
+      emitSocketEvent('order:new', {
+        orderId: order.id,
+        totalAmount: order.totalAmount,
+        customerName: customer?.name || 'Customer',
+        paymentMethod: order.paymentMethod,
+      });
+    } catch (socketErr) {
+      console.warn('⚠️ [Socket.io] Failed to emit new order alert:', socketErr);
+    }
 
     if (config.meta.n8nWebhookUrl) {
       try {
@@ -110,9 +151,9 @@ ${courierInfo}
           {
             event: 'ORDER_CONFIRMED',
             orderId: order.id,
-            customerName: customer.name,
-            customerPhone: customer.phone,
-            deliveryAddress: `${customer.fullAddress}, ${customer.district}`,
+            customerName: customer?.name,
+            customerPhone: customer?.phone,
+            deliveryAddress: `${customer?.fullAddress}, ${customer?.district}`,
             items: order.items,
             productTotal: order.productTotal,
             deliveryCharge: order.deliveryCharge,
@@ -149,11 +190,11 @@ ${courierInfo}
       consignmentId: order.consignmentId || 'Pending',
       trackingCode: order.trackingCode || 'Pending',
       dateTime: new Date(order.createdAt || Date.now()).toISOString(),
-      customerName: customer.name || 'N/A',
-      phoneNumber: customer.phone || 'N/A',
-      district: customer.district || 'N/A',
-      thana: customer.thana || 'N/A',
-      deliveryAddress: customer.fullAddress || 'N/A',
+      customerName: customer?.name || 'N/A',
+      phoneNumber: customer?.phone || 'N/A',
+      district: customer?.district || 'N/A',
+      thana: customer?.thana || 'N/A',
+      deliveryAddress: customer?.fullAddress || 'N/A',
       orderedProducts: productSummary,
       productTotal: order.productTotal,
       deliveryCharge: order.deliveryCharge,
@@ -164,7 +205,7 @@ ${courierInfo}
       courierStatus: order.consignmentId ? 'Booked' : 'Pending',
       orderStatus: order.orderStatus,
       sourceChannel: order.sourceChannel,
-      customerId: customer.id,
+      customerId: customer?.id,
     };
 
     console.log(`📊 [Google Sheet Backup] Queuing row for Order ${order.id}...`);
@@ -187,4 +228,3 @@ ${courierInfo}
     }
   },
 };
-

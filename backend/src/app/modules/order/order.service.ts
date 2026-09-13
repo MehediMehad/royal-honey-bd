@@ -326,6 +326,16 @@ const updateOrderStatus = async (
     },
   });
 
+  try {
+    const { emitSocketEvent } = await import('../../libs/socket');
+    emitSocketEvent('order:status_updated', {
+      orderId: updated.id,
+      status: updated.orderStatus,
+    });
+  } catch (socketErr) {
+    console.warn('⚠️ [Socket.io] Failed to emit order:status_updated:', socketErr);
+  }
+
   return updated;
 };
 

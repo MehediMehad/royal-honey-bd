@@ -45,16 +45,20 @@ export const initSocket = (httpServer: HttpServer): SocketIoServer => {
       socket.join('admin');
     }
 
-    // Join specific conversation room
-    socket.on('join_conversation', (conversationId: string) => {
+    // Join specific conversation room (support both join:conversation and join_conversation)
+    const handleJoin = (conversationId: string) => {
       socket.join(`conversation:${conversationId}`);
       console.log(`💬 [Socket.io] Socket ${socket.id} joined conversation:${conversationId}`);
-    });
+    };
+    socket.on('join_conversation', handleJoin);
+    socket.on('join:conversation', handleJoin);
 
     // Leave conversation room
-    socket.on('leave_conversation', (conversationId: string) => {
+    const handleLeave = (conversationId: string) => {
       socket.leave(`conversation:${conversationId}`);
-    });
+    };
+    socket.on('leave_conversation', handleLeave);
+    socket.on('leave:conversation', handleLeave);
 
     socket.on('disconnect', () => {
       console.log(`🔌 [Socket.io] Client disconnected: ${socket.id}`);

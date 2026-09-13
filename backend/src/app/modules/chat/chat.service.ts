@@ -108,6 +108,20 @@ const saveCustomerMessage = async (
     }),
   ]);
 
+  // Emit real-time event to admin and active conversation room
+  try {
+    const { emitSocketEvent } = await import('../../libs/socket');
+    const payload = {
+      ...message,
+      text: message.content,
+      sender: message.sender,
+    };
+    emitSocketEvent('message:new', payload, `conversation:${conversationId}`);
+    emitSocketEvent('message:new', payload);
+  } catch (socketErr) {
+    console.warn('⚠️ [Socket.io] Failed to emit customer message:', socketErr);
+  }
+
   return message;
 };
 
@@ -144,6 +158,20 @@ const saveAiMessage = async (conversationId: string, content: string) => {
       data: { lastMessageAt: new Date() },
     }),
   ]);
+
+  // Emit real-time event to admin and active conversation room
+  try {
+    const { emitSocketEvent } = await import('../../libs/socket');
+    const payload = {
+      ...message,
+      text: message.content,
+      sender: message.sender,
+    };
+    emitSocketEvent('message:new', payload, `conversation:${conversationId}`);
+    emitSocketEvent('message:new', payload);
+  } catch (socketErr) {
+    console.warn('⚠️ [Socket.io] Failed to emit AI message:', socketErr);
+  }
 
   return message;
 };
@@ -404,16 +432,15 @@ const sendAgentReply = async (
     );
   }
 
-  // Broadcast socket event
+  // Broadcast socket event (emit both message:new and new_message for compatibility)
   const { emitSocketEvent } = await import('../../libs/socket');
-  emitSocketEvent(
-    'new_message',
-    {
-      conversationId,
-      message,
-    },
-    `conversation:${conversationId}`,
-  );
+  const payload = {
+    ...message,
+    text: message.content,
+    sender: message.sender,
+  };
+  emitSocketEvent('message:new', payload, `conversation:${conversationId}`);
+  emitSocketEvent('message:new', payload);
   emitSocketEvent('new_message', { conversationId, message });
 
   return message;

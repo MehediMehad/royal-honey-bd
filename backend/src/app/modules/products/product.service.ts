@@ -175,6 +175,19 @@ const restockProduct = async (
     return { product: updated, restockLog: log };
   });
 
+  try {
+    const { emitSocketEvent } = await import('../../libs/socket');
+    emitSocketEvent('inventory:low_stock', {
+      productId: result.product.id,
+      productName: result.product.name,
+      remainingStock: result.product.stockCount,
+      minThreshold: result.product.minThreshold,
+      restocked: true,
+    });
+  } catch (socketErr) {
+    console.warn('⚠️ [Socket.io] Failed to emit restock update:', socketErr);
+  }
+
   return result;
 };
 

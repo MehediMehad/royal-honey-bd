@@ -1,0 +1,89 @@
+model Customer {
+  id            String   @id @default(uuid())
+  phone         String?  @unique
+  name          String?
+  district      String?
+  thana         String?
+  fullAddress   String?
+  fraudRiskRate Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  channelUsers  ChannelUser[]
+  orders        Order[]
+  carts         Cart[]
+  conversations Conversation[]
+
+  @@map("customers")
+}
+
+model ChannelUser {
+  id         String              @id @default(uuid())
+  customerId String
+  channel    CustomerChannelEnum
+  channelId  String // Facebook PSID or WhatsApp Phone
+  createdAt  DateTime            @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([channel, channelId])
+  @@index([channelId])
+  @@map("channel_users")
+}
+
+model Conversation {
+  id            String              @id @default(uuid())
+  customerId    String
+  channel       CustomerChannelEnum
+  status        ConversationStatus  @default(AI_ACTIVE)
+  lastMessageAt DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages      Message[]
+  humanHandoffs HumanHandoff[]
+
+  @@index([customerId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  sender         SenderType // CUSTOMER or AGENT or BOT
+  messageType    MessageType @default(TEXT)
+  content        String      @db.Text
+  mediaUrl       String?
+  metadata       Json?
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+enum CustomerChannelEnum {
+  FACEBOOK
+  WHATSAPP
+}
+
+enum ConversationStatus {
+  AI_ACTIVE
+  HUMAN_TAKEOVER
+  CLOSED
+}
+
+enum SenderType {
+  CUSTOMER
+  AI_BOT
+  HUMAN_AGENT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+}

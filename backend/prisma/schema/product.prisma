@@ -1,0 +1,35 @@
+model Product {
+  id                String   @id
+  name              String
+  price             Float
+  weight            String
+  description       String?  @db.Text
+  stockCount        Int      @default(100)
+  minThreshold      Int      @default(10)
+  lowStockAlertSent Boolean  @default(false)
+  isAvailable       Boolean  @default(true)
+  imageUrl          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+  restockLogs RestockLog[]
+
+  @@map("products")
+}
+
+model RestockLog {
+  id            String   @id @default(uuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantityAdded Int
+  previousStock Int
+  newStock      Int
+  restockedBy   String?
+  note          String?
+  createdAt     DateTime @default(now())
+
+  @@index([productId])
+  @@map("restock_logs")
+}

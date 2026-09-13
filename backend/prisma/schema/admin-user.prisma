@@ -1,0 +1,25 @@
+model AdminUser {
+  id          String          @id @default(uuid())
+  name        String
+  email       String          @unique
+  phone       String?         @unique
+  password    String
+  role        AdminRoleEnum   @default(OWNER)
+  status      AdminStatusEnum @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("admin_users")
+}
+
+enum AdminRoleEnum {
+  OWNER
+  SUPPORT_AGENT
+}
+
+enum AdminStatusEnum {
+  ACTIVE
+  BLOCKED
+  SUSPENDED
+}

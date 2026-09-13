@@ -1,0 +1,22 @@
+model KnowledgeItem {
+  id        String                @id @default(uuid())
+  category  KnowledgeCategoryEnum @default(FAQ)
+  question  String
+  answer    String                @db.Text
+  tags      String[]
+  embedding Float[]
+  isActive  Boolean               @default(true)
+  metadata  Json?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  @@index([category])
+  @@map("knowledge_items")
+}
+
+enum KnowledgeCategoryEnum {
+  FAQ
+  POLICY
+  HONEY_GUIDE
+  ANNOUNCEMENT
+}

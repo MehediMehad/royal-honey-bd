@@ -1,7 +1,8 @@
 import { type KnowledgeCategoryEnum, Prisma } from '@prisma/client';
 import httpStatus from 'http-status';
+import config from '../../../configs';
 import ApiError from '../../errors/ApiError';
-import { aiClient } from '../../libs/gemini';
+import { openai } from '../../libs/openai';
 import prisma from '../../libs/prisma';
 import type {
   ICreateKnowledgePayload,
@@ -12,19 +13,23 @@ import type {
 import type { IPaginationOptions } from '../products/product.interface';
 
 /**
- * Generate embedding vector using Gemini Embedding model
+ * Generate embedding vector using OpenAI text-embedding-3-small
  */
 export const generateEmbedding = async (text: string): Promise<number[]> => {
   try {
-    const cleanText = text.replace(/\s+/g, ' ').trim().slice(0, 2048);
+    if (!config.openai.apiKey) {
+      return [];
+    }
+
+    const cleanText = text.replace(/\s+/g, ' ').trim().slice(0, 4096);
     if (!cleanText) return [];
 
-    const response = await aiClient.models.embedContent({
-      model: 'gemini-embedding-001',
-      contents: cleanText,
+    const response = await openai.embeddings.create({
+      model: config.openai.embeddingModel,
+      input: cleanText,
     });
 
-    const values = response.embeddings?.[0]?.values;
+    const values = response.data?.[0]?.embedding;
     if (!values || !Array.isArray(values)) {
       return [];
     }
@@ -32,7 +37,7 @@ export const generateEmbedding = async (text: string): Promise<number[]> => {
     return values;
   } catch (error: any) {
     console.warn(
-      '⚠️ Notice: Gemini embedding generation skipped/failed:',
+      '⚠️ Notice: OpenAI embedding generation skipped/failed:',
       error?.message || error,
     );
     return [];

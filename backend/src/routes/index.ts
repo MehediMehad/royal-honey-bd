@@ -4,6 +4,8 @@ import { KnowledgeRoutes } from '../app/modules/knowledge/knowledge.route';
 import { ProductRoutes } from '../app/modules/products/product.route';
 import { OrderRoutes } from '../app/modules/order/order.route';
 import { CourierRoutes } from '../app/modules/courier/courier.route';
+import { ChatRoutes } from '../app/modules/chat/chat.route';
+import { DashboardRoutes } from '../app/modules/admin/dashboard.route';
 import { WebhookRoutes } from '../app/modules/webhook/webhook.route';
 
 const router = express.Router();
@@ -12,6 +14,14 @@ const moduleRoutes = [
   {
     path: '/auth',
     route: AuthRoutes,
+  },
+  {
+    path: '/admin',
+    route: DashboardRoutes,
+  },
+  {
+    path: '/chat',
+    route: ChatRoutes,
   },
   {
     path: '/products',

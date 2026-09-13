@@ -1,14 +1,20 @@
-import type { Server as HttpServer } from 'http';
+import http from 'http';
 import app from './app';
 import config from './configs';
 import { setupChatWorker } from './app/modules/chat/chat.worker';
+import { initSocket } from './app/libs/socket';
 
-let server: HttpServer;
+let server: http.Server;
 
 async function main() {
   try {
     const port = config.app.port || 5000;
-    server = app.listen(port, () => {
+    server = http.createServer(app);
+
+    // Attach Socket.io WebSocket server
+    initSocket(server);
+
+    server.listen(port, () => {
       console.log(`🚀 Royal Honey BD server running on port ${port}`);
       console.log(`🍯 Environment: ${config.app.env}`);
       console.log(`🌐 Base API URL: http://localhost:${port}/api/v1`);

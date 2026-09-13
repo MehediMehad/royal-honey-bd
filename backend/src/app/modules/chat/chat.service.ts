@@ -6,82 +6,14 @@ import {
 } from '@prisma/client';
 import prisma from '../../libs/prisma';
 import type { IProcessMessageJob, IRecentMessageContext } from './chat.interface';
+import { CustomerIdentityService } from '../customer/customer.identity';
 
 const getOrCreateCustomerAndConversation = async (job: IProcessMessageJob) => {
-  let channelUser = await prisma.channelUser.findUnique({
-    where: {
-      channel_channelId: {
-        channel: job.channel,
-        channelId: job.channelId,
-      },
-    },
-    include: { customer: true },
-  });
-
-  let customerId: string;
-
-  if (!channelUser) {
-    const isWhatsApp = job.channel === CustomerChannelEnum.WHATSAPP;
-    const phone = isWhatsApp ? job.channelId : null;
-
-    // Check if customer with this phone already exists
-    let existingCustomer = phone
-      ? await prisma.customer.findUnique({ where: { phone } })
-      : null;
-
-    if (!existingCustomer) {
-      existingCustomer = await prisma.customer.create({
-        data: {
-          name: job.senderName || null,
-          phone,
-        },
-      });
-    }
-
-    customerId = existingCustomer.id;
-
-    channelUser = await prisma.channelUser.create({
-      data: {
-        customerId,
-        channel: job.channel,
-        channelId: job.channelId,
-      },
-      include: { customer: true },
-    });
-  } else {
-    customerId = channelUser.customerId;
-    // Update name if customer had no name and senderName is provided
-    if (!channelUser.customer.name && job.senderName) {
-      await prisma.customer.update({
-        where: { id: customerId },
-        data: { name: job.senderName },
-      });
-    }
-  }
-
-  // Find active conversation
-  let conversation = await prisma.conversation.findFirst({
-    where: {
-      customerId,
-      channel: job.channel,
-      status: { in: [ConversationStatus.AI_ACTIVE, ConversationStatus.HUMAN_TAKEOVER] },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  if (!conversation) {
-    conversation = await prisma.conversation.create({
-      data: {
-        customerId,
-        channel: job.channel,
-        status: ConversationStatus.AI_ACTIVE,
-      },
-    });
-  }
-
+  const result = await CustomerIdentityService.resolveCustomerIdentity(job);
   return {
-    customer: channelUser.customer,
-    conversation,
+    customer: result.customer,
+    conversation: result.conversation,
+    wasCrossChannelMerged: result.wasCrossChannelMerged,
   };
 };
 
@@ -159,6 +91,36 @@ const getRecentConversationHistory = async (
   return messages.reverse();
 };
 
+/**
+ * Get chronological recent message history across ALL channels for a unified customer
+ */
+const getCrossChannelMessageHistory = async (
+  customerId: string,
+  limit = 10,
+): Promise<Array<IRecentMessageContext & { channel: CustomerChannelEnum }>> => {
+  const messages = await prisma.message.findMany({
+    where: {
+      conversation: {
+        customerId,
+      },
+    },
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      conversation: {
+        select: { channel: true },
+      },
+    },
+  });
+
+  return messages.reverse().map((msg) => ({
+    sender: msg.sender,
+    content: msg.content,
+    createdAt: msg.createdAt,
+    channel: msg.conversation.channel,
+  }));
+};
+
 const saveAiMessage = async (conversationId: string, content: string) => {
   const [message] = await prisma.$transaction([
     prisma.message.create({
@@ -219,6 +181,7 @@ const getAllConversations = async (filters: {
     include: {
       customer: {
         include: {
+          channelUsers: true,
           carts: {
             orderBy: { updatedAt: 'desc' },
             take: 1,
@@ -258,6 +221,7 @@ const getAllConversations = async (filters: {
         district: conv.customer.district,
         thana: conv.customer.thana,
         fullAddress: conv.customer.fullAddress,
+        linkedChannels: conv.customer.channelUsers?.map((cu) => cu.channel) || [],
         cartItemsCount: activeCart?.items?.length || 0,
         cartTotal: (activeCart?.items || []).reduce(
           (sum, item) => sum + item.quantity * item.unitPrice,
@@ -291,6 +255,7 @@ const getConversationMessages = async (conversationId: string) => {
     include: {
       customer: {
         include: {
+          channelUsers: true,
           carts: {
             orderBy: { updatedAt: 'desc' },
             take: 1,
@@ -316,11 +281,25 @@ const getConversationMessages = async (conversationId: string) => {
   const messages = await prisma.message.findMany({
     where: { conversationId },
     orderBy: { createdAt: 'asc' },
+    include: {
+      conversation: {
+        select: { channel: true },
+      },
+    },
   });
 
   return {
-    conversation,
-    messages,
+    conversation: {
+      ...conversation,
+      customer: {
+        ...conversation.customer,
+        linkedChannels: conversation.customer.channelUsers?.map((cu) => cu.channel) || [],
+      },
+    },
+    messages: messages.map((m) => ({
+      ...m,
+      channel: m.conversation?.channel || conversation.channel,
+    })),
   };
 };
 
@@ -466,6 +445,7 @@ export const ChatServices = {
   getOrCreateCustomerAndConversation,
   saveCustomerMessage,
   getRecentConversationHistory,
+  getCrossChannelMessageHistory,
   saveAiMessage,
   getAllConversations,
   getConversationMessages,

@@ -81,12 +81,17 @@ const generateCustomerReply = async (
     const cartCard = CartServices.formatCartSummary(session.cart, session.district);
     const missingPrompt = CustomerServices.formatMissingFieldsPrompt(session.missingFields);
 
+    const linkedChannelsStr =
+      session.linkedChannels && session.linkedChannels.length > 1
+        ? `\n- সংযুক্ত চ্যানেলসমূহ: ${session.linkedChannels.join(', ')} (Facebook & WhatsApp একীভূত একাউন্ট)`
+        : '';
+
     customerStateContext = `
 【গ্রাহকের বর্তমান প্রোফাইল ও কার্ট স্টেট】
 - কাস্টমার নাম: ${session.name || 'দেওয়া হয়নি'}
 - ফোন নম্বর: ${session.phone || 'দেওয়া হয়নি'}
 - জেলা: ${session.district || 'দেওয়া হয়নি'}
-- পূর্ণ ঠিকানা: ${session.fullAddress || 'দেওয়া হয়নি'}
+- পূর্ণ ঠিকানা: ${session.fullAddress || 'দেওয়া হয়নি'}${linkedChannelsStr}
 - বাকি থাকা ফিল্ডসমূহ: ${session.missingFields.length > 0 ? session.missingFields.join(', ') : 'সব তথ্য পাওয়া গেছে!'}
 
 ${cartCard}
@@ -115,7 +120,10 @@ ${missingPrompt}
    - ১ বছরের কম বয়সী শিশুদের মধু খাওয়ানো সম্পূর্ণ নিষেধ।
 6. রিপ্লেসমেন্ট গ্যারান্টি:
    - পার্সেল ভাঙা বা ক্ষতিগ্রস্ত পেলে ডেলিভারির ২৪ ঘণ্টার মধ্যে আনবক্সিং ভিডিও দিলে সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দেওয়া হবে।
-7. কার্ট ও কাস্টমার স্টেট গাইডলাইন:
+7. ক্রস-চ্যানেল একীভূত অভিজ্ঞতা (Cross-Channel Continuity):
+   - গ্রাহক ফেসবুক বা হোয়াটসঅ্যাপ যেখানেই অর্ডার শুরু করুক না কেন, চ্যানেল পরিবর্তন করলে তার কার্ট সংরক্ষিত থাকবে।
+   - তাকে নতুন করে আবার সব বলতে বলবেন না, বরং পূর্বের কার্টের প্রসঙ্গ টেনে অর্ডার সম্পন্ন করতে সাহায্য করুন।
+8. কার্ট ও কাস্টমার স্টেট গাইডলাইন:
    - গ্রাহক কোনো পণ্য যোগ বা পরিবর্তন করলে তার কার্ট সামারি কার্ডটি উত্তরে সুন্দরভাবে দেখান।
    - গ্রাহক যেসব তথ্য ইতিমধ্যে দিয়েছে (যেমন নাম বা ফোন নম্বর), তা বারবার জিজ্ঞেস করবেন না!
    - শুধুমাত্র যেসব তথ্য এখনো বাকি (Missing) আছে, বিনম্রভাবে শুধুমাত্র সেই তথ্যগুলোই চেয়ে নিন।
@@ -136,11 +144,14 @@ ${customerStateContext}
 
   const messages: any[] = [{ role: 'system', content: systemInstruction.trim() }];
 
-  // Append recent conversation context
+  // Append recent conversation context with channel awareness
   for (const h of history) {
+    const channelTag = (h as any).channel
+      ? `[${(h as any).channel === 'WHATSAPP' ? 'WhatsApp' : 'Facebook'}] `
+      : '';
     messages.push({
       role: h.sender === 'CUSTOMER' ? 'user' : 'assistant',
-      content: h.content,
+      content: `${channelTag}${h.content}`,
     });
   }
 

@@ -1,57 +1,70 @@
 import prisma from '../../libs/prisma';
 import { CustomerSession, type ICustomerSession } from './customer.session';
 import type { IExtractedEntities } from './customer.extractor';
+import { CustomerIdentityService, normalizeBdPhone } from './customer.identity';
 
 /**
- * Update customer profile details and sync both PostgreSQL and Redis
+ * Update customer profile details and sync both PostgreSQL and Redis,
+ * automatically resolving and merging cross-channel identities if phone matches an existing customer.
  */
 const updateCustomerProfile = async (
   customerId: string,
   info?: IExtractedEntities['customerInfo'],
 ): Promise<ICustomerSession> => {
-  const session = await CustomerSession.getSession(customerId);
+  let activeCustomerId = customerId;
+  let session = await CustomerSession.getSession(activeCustomerId);
   if (!info) return session;
 
   const updateData: Record<string, any> = {};
 
   if (info.name && info.name.trim().length >= 2) {
     updateData.name = info.name.trim();
-    session.name = updateData.name;
   }
 
   if (info.phone) {
-    const cleanPhone = info.phone.replace(/[\s-+]/g, '');
-    const validPhone = cleanPhone.startsWith('01')
-      ? cleanPhone
-      : cleanPhone.slice(-11);
+    const validPhone = normalizeBdPhone(info.phone);
+    if (validPhone) {
+      // Check if another customer already has this phone (Cross-channel match)
+      const existingCustomerWithPhone = await prisma.customer.findUnique({
+        where: { phone: validPhone },
+      });
 
-    if (/^01[3-9]\d{8}$/.test(validPhone)) {
-      updateData.phone = validPhone;
-      session.phone = validPhone;
+      if (existingCustomerWithPhone && existingCustomerWithPhone.id !== activeCustomerId) {
+        console.log(
+          `🔗 [CustomerService] Cross-channel match detected for phone ${validPhone}. Merging ${activeCustomerId} into ${existingCustomerWithPhone.id}...`,
+        );
+        const mergeResult = await CustomerIdentityService.mergeCustomerIdentities(
+          activeCustomerId,
+          existingCustomerWithPhone.id,
+        );
+        activeCustomerId = mergeResult.unifiedCustomerId;
+      } else {
+        updateData.phone = validPhone;
+      }
     }
   }
 
   if (info.district && info.district.trim().length >= 2) {
     updateData.district = info.district.trim();
-    session.district = updateData.district;
   }
 
   if (info.thana && info.thana.trim().length >= 2) {
     updateData.thana = info.thana.trim();
-    session.thana = updateData.thana;
   }
 
   if (info.fullAddress && info.fullAddress.trim().length >= 5) {
     updateData.fullAddress = info.fullAddress.trim();
-    session.fullAddress = updateData.fullAddress;
   }
 
   if (Object.keys(updateData).length > 0) {
     await prisma.customer.update({
-      where: { id: customerId },
+      where: { id: activeCustomerId },
       data: updateData,
     });
   }
+
+  // Refresh and update session
+  session = await CustomerSession.hydrateSessionFromDb(activeCustomerId);
 
   // Recalculate delivery fee if district changed
   if (info.district && session.cart.items.length > 0) {

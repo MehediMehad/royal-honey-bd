@@ -253,14 +253,16 @@ export const setupChatWorker = () => {
       }
 
       // 4. Hydrate Customer Session (Redis Cache + PostgreSQL fallback)
-      let session = await CustomerSession.getSession(customer.id);
+      let activeCustomerId = customer.id;
+      let session = await CustomerSession.getSession(activeCustomerId);
 
       // 4.1 Vision Branch: Address Proof (Handwritten / Typed screenshot extraction)
       if (visionResult?.imageCategory === 'ADDRESS_PROOF' && visionResult.addressData) {
         session = await CustomerServices.updateCustomerProfile(
-          customer.id,
+          activeCustomerId,
           visionResult.addressData,
         );
+        activeCustomerId = session.customerId;
       }
 
       // 5. Extract Customer Details, Cart Actions, Payment Method & Confirmation Intent via OpenAI
@@ -279,9 +281,10 @@ export const setupChatWorker = () => {
       // 6. Apply Customer Profile Updates (Name, Phone, Address, District)
       if (extracted.customerInfo && Object.keys(extracted.customerInfo).length > 0) {
         session = await CustomerServices.updateCustomerProfile(
-          customer.id,
+          activeCustomerId,
           extracted.customerInfo,
         );
+        activeCustomerId = session.customerId;
       }
 
       // 7. Apply Cart Modifications (Real-time Stock Validation)
@@ -290,30 +293,30 @@ export const setupChatWorker = () => {
           const qty = cartAction.quantity || 1;
           if (cartAction.action === 'ADD') {
             await CartServices.addItemToCart(
-              customer.id,
+              activeCustomerId,
               cartAction.productKeyword,
               qty,
               session.district,
             );
           } else if (cartAction.action === 'UPDATE') {
             await CartServices.updateItemQuantity(
-              customer.id,
+              activeCustomerId,
               cartAction.productKeyword,
               qty,
               session.district,
             );
           } else if (cartAction.action === 'REMOVE') {
             await CartServices.removeItemFromCart(
-              customer.id,
+              activeCustomerId,
               cartAction.productKeyword,
               session.district,
             );
           } else if (cartAction.action === 'CLEAR') {
-            await CartServices.clearCart(customer.id);
+            await CartServices.clearCart(activeCustomerId);
           }
         }
         // Refresh session after cart changes
-        session = await CustomerSession.getSession(customer.id);
+        session = await CustomerSession.getSession(activeCustomerId);
       }
 
       let aiReply = '';
@@ -325,7 +328,7 @@ export const setupChatWorker = () => {
       // Case 8.0: Customer has already placed an order awaiting payment, and now sends screenshot
       const existingPendingOrder = await prisma.order.findFirst({
         where: {
-          customerId: customer.id,
+          customerId: activeCustomerId,
           orderStatus: OrderStatus.PAYMENT_VERIFICATION_PENDING,
         },
         orderBy: { createdAt: 'desc' },
@@ -359,7 +362,7 @@ export const setupChatWorker = () => {
           ? `\n💰 এক্সট্র্যাক্ট করা অ্যামাউন্ট: ৳${visionResult.paymentData.amount}`
           : '';
 
-        aiReply = `আপনার পেমেন্টের স্ক্রিনশট আমরা পেয়েছি।\n\n📌 ট্রানজেকশন আইডি (TrxID): ${detectedTrxId}${amountStr}\n\nআমাদের অ্যাকাউন্টস টিম স্টেটমেন্টের সাথে পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${updatedOrder.id}\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
+        aiReply = `আপনার পেমেন্টের স্ক্রিনশট আমরা পেয়েছি।\n\n📌 ট্রানজেকশন আইডি (TrxID): ${detectedTrxId}${amountStr}\n\nআমাদের অ্যাকাউন্টস টিম স্টেটমেন্টের সাথে পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${updatedOrder.id}\n📍 ডেলিভারি ঠিকানা: ${session.fullAddress || customer.fullAddress}, ${session.district || customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
       }
       // Case 8.1: Customer submits Advance Payment Transaction ID (TrxID) or payment screenshot with active cart
       else if (hasAllDetails && isPaymentProof) {
@@ -372,7 +375,7 @@ export const setupChatWorker = () => {
             'স্ক্রিনশট প্রদান করা হয়েছে';
 
           const order = await OrderServices.createAtomicOrder({
-            customerId: customer.id,
+            customerId: activeCustomerId,
             paymentMethod: method,
             transactionId: detectedTrxId,
             paymentProofUrl: mediaUrl || undefined,
@@ -383,7 +386,7 @@ export const setupChatWorker = () => {
             ? `\n💰 এক্সট্র্যাক্ট করা অ্যামাউন্ট: ৳${visionResult.paymentData.amount}`
             : '';
 
-          aiReply = `আপনার পেমেন্টের তথ্য (TrxID: ${detectedTrxId}) আমরা পেয়েছি।${amountStr}\n\nআমাদের অ্যাকাউন্টস টিম পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${order.id}\n💰 মোট প্রদেয়: ৳${order.totalAmount}\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
+          aiReply = `আপনার পেমেন্টের তথ্য (TrxID: ${detectedTrxId}) আমরা পেয়েছি।${amountStr}\n\nআমাদের অ্যাকাউন্টস টিম পেমেন্টটি ভেরিফাই করার সাথে সাথেই আপনার অর্ডারটি কনফার্ম করে জানিয়ে দেওয়া হবে। সাধারণত ৫-১০ মিনিট সময় লাগতে পারে।\n\n📦 অর্ডার আইডি: ${order.id}\n💰 মোট প্রদেয়: ৳${order.totalAmount}\n📍 ডেলিভারি ঠিকানা: ${session.fullAddress || customer.fullAddress}, ${session.district || customer.district}\n\nধৈর্য ধরার জন্য ধন্যবাদ ❤️`;
         } catch (err: any) {
           console.error('❌ Order placement failed with TrxID/Screenshot:', err?.message || err);
           aiReply = `দুঃখিত! ${err?.message || 'অর্ডার সম্পন্ন করা সম্ভব হয়নি।'} অনুগ্রহ করে আমাদের হেল্পলাইনে (01604121107) যোগাযোগ করুন।`;
@@ -401,7 +404,7 @@ export const setupChatWorker = () => {
           // Cash on Delivery (COD) order confirmation
           try {
             const order = await OrderServices.createAtomicOrder({
-              customerId: customer.id,
+              customerId: activeCustomerId,
               paymentMethod: PaymentMethod.COD,
               sourceChannel: conversation.channel,
             });
@@ -417,7 +420,7 @@ export const setupChatWorker = () => {
               console.warn('⚠️ Auto courier booking failed:', courierErr);
             }
 
-            aiReply = `✅ আপনার অর্ডারটি সফলভাবে Confirm করা হয়েছে!\n\n📦 Order ID: ${order.id}${trackingInfo}\n💰 মোট Payable: ৳${order.totalAmount} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${customer.fullAddress}, ${customer.district}\n\nআমাদের পক্ষ থেকে পার্সেলটি দ্রুত কুরিয়ারে হস্তান্তর করা হবে। Royal Honey BD-এর সাথে থাকার জন্য ধন্যবাদ ❤️`;
+            aiReply = `✅ আপনার অর্ডারটি সফলভাবে Confirm করা হয়েছে!\n\n📦 Order ID: ${order.id}${trackingInfo}\n💰 মোট Payable: ৳${order.totalAmount} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${session.fullAddress || customer.fullAddress}, ${session.district || customer.district}\n\nআমাদের পক্ষ থেকে পার্সেলটি দ্রুত কুরিয়ারে হস্তান্তর করা হবে। Royal Honey BD-এর সাথে থাকার জন্য ধন্যবাদ ❤️`;
           } catch (err: any) {
             console.error('❌ Order placement failed for COD:', err?.message || err);
             aiReply = `দুঃখিত! ${err?.message || 'অর্ডার সম্পন্ন করা সম্ভব হয়নি।'} অনুগ্রহ করে হেল্পলাইনে যোগাযোগ করুন।`;
@@ -425,12 +428,12 @@ export const setupChatWorker = () => {
         }
       }
 
-      // 9. Standard AI Support Response if not order confirmed
+      // 9. Standard AI Support Response if not order confirmed (Phase 10: Cross-Channel Message History)
       if (!aiReply) {
-        const history = await ChatServices.getRecentConversationHistory(conversation.id, 8);
+        const history = await ChatServices.getCrossChannelMessageHistory(activeCustomerId, 8);
         aiReply = await AiAgent.generateCustomerReply(
           processedText,
-          customer.name,
+          session.name || customer.name,
           history,
           session,
         );

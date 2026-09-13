@@ -1,3 +1,4 @@
+import { CustomerChannelEnum } from '@prisma/client';
 import { redis } from '../../libs/redis';
 import prisma from '../../libs/prisma';
 
@@ -17,6 +18,7 @@ export interface ICustomerSession {
   district: string | null;
   thana: string | null;
   fullAddress: string | null;
+  linkedChannels?: CustomerChannelEnum[];
   cart: {
     cartId: string | null;
     items: ICartSessionItem[];
@@ -94,6 +96,7 @@ const hydrateSessionFromDb = async (
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
     include: {
+      channelUsers: true,
       carts: {
         orderBy: { updatedAt: 'desc' },
         take: 1,
@@ -130,6 +133,7 @@ const hydrateSessionFromDb = async (
     district: customer?.district || null,
     thana: customer?.thana || null,
     fullAddress: customer?.fullAddress || null,
+    linkedChannels: customer?.channelUsers?.map((cu) => cu.channel) || [],
     cart: {
       cartId: activeCart?.id || null,
       items,

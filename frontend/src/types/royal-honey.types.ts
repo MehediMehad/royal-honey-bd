@@ -53,6 +53,9 @@ export interface Customer {
   thana?: string | null;
   fullAddress?: string | null;
   fraudRiskRate?: number | null;
+  linkedChannels?: CustomerChannel[];
+  cartItemsCount?: number;
+  cartTotal?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +103,7 @@ export interface Message {
   content: string;
   mediaUrl?: string | null;
   metadata?: Record<string, unknown> | null;
+  channel?: CustomerChannel;
   createdAt: string;
 }
 

@@ -291,8 +291,18 @@ export default function AdminInboxPage() {
                         {conv.customer?.name?.[0]?.toUpperCase() || "C"}
                       </div>
                       <div>
-                        <div className="font-bold text-xs text-foreground line-clamp-1">
-                          {conv.customer?.name || "Customer"}
+                        <div className="font-bold text-xs text-foreground line-clamp-1 flex items-center gap-1.5">
+                          <span>{conv.customer?.name || "Customer"}</span>
+                          {conv.customer?.linkedChannels &&
+                          conv.customer.linkedChannels.length > 1 ? (
+                            <span className="text-[8px] font-extrabold px-1 rounded bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              FB+WA
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-bold px-1 rounded bg-muted text-muted-foreground uppercase">
+                              {conv.channel === "WHATSAPP" ? "WA" : "FB"}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] font-mono text-muted-foreground flex items-center gap-1">
                           <Phone className="size-2.5" />
@@ -338,13 +348,23 @@ export default function AdminInboxPage() {
                 {activeConversation.customer?.name?.[0]?.toUpperCase() || "C"}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-extrabold text-sm text-foreground">
                     {activeConversation.customer?.name || "Customer"}
                   </h4>
                   <Badge variant="outline" className="text-[10px] font-bold uppercase">
                     {activeConversation.channel}
                   </Badge>
+                  {activeConversation.customer?.linkedChannels &&
+                    activeConversation.customer.linkedChannels.length > 1 && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] font-bold border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center gap-1"
+                      >
+                        <Sparkles className="size-2.5 text-blue-500" />
+                        <span>Unified (FB + WA)</span>
+                      </Badge>
+                    )}
                   <Badge
                     className={`text-[10px] font-bold border-0 ${
                       activeConversation.status === "AI_ACTIVE"
@@ -445,6 +465,16 @@ export default function AdminInboxPage() {
                           </span>
                         </>
                       )}
+                      {msg.channel &&
+                        activeConversation.customer?.linkedChannels &&
+                        activeConversation.customer.linkedChannels.length > 1 && (
+                          <>
+                            <span>·</span>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted/80 font-bold uppercase text-muted-foreground border border-border/40">
+                              {msg.channel === "WHATSAPP" ? "WA" : "FB"}
+                            </span>
+                          </>
+                        )}
                       <span>·</span>
                       <span>
                         {new Date(msg.createdAt).toLocaleTimeString([], {

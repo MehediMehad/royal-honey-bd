@@ -13,6 +13,7 @@ import {
   Sparkles,
   Loader2,
   Mic,
+  Video,
 } from "lucide-react";
 import { chatService } from "@/services/chat.service";
 import { getSocket } from "@/lib/socket";
@@ -499,10 +500,34 @@ export default function AdminInboxPage() {
                           </div>
                         )}
 
+                      {/* Video Player Widget if Video Message (Phase 9: Video Understanding) */}
+                      {(msg.messageType === "VIDEO" ||
+                        (msg.mediaUrl &&
+                          msg.mediaUrl.match(/\.(mp4|webm|mov|mkv|avi|3gp)/i))) &&
+                        msg.mediaUrl && (
+                          <div className="mb-2 overflow-hidden rounded-xl border border-border/80 max-w-sm bg-black shadow-sm">
+                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-400 p-2 bg-black/60 border-b border-white/10">
+                              <Video className="size-3 text-amber-400" />
+                              <span>কাস্টমার ভিডিও মেসেজ</span>
+                            </div>
+                            <video
+                              controls
+                              src={msg.mediaUrl}
+                              className="max-h-64 w-full rounded-b-xl"
+                              preload="metadata"
+                            />
+                          </div>
+                        )}
+
                       <div className="flex items-start gap-1.5">
                         {msg.messageType === "AUDIO" && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold uppercase shrink-0">
                             ভয়েস টেক্সট
+                          </span>
+                        )}
+                        {msg.messageType === "VIDEO" && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-700 dark:text-blue-400 font-bold uppercase shrink-0">
+                            ভিডিও টেক্সট
                           </span>
                         )}
                         <p className="whitespace-pre-wrap">{msg.content}</p>

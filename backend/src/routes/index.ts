@@ -9,6 +9,7 @@ import { DashboardRoutes } from '../app/modules/admin/dashboard.route';
 import { WebhookRoutes } from '../app/modules/webhook/webhook.route';
 import { VoiceRoutes } from '../app/modules/voice/voice.route';
 import { VisionRoutes } from '../app/modules/vision/vision.route';
+import { VideoRoutes } from '../app/modules/video/video.route';
 
 const router = express.Router();
 
@@ -52,6 +53,10 @@ const moduleRoutes = [
   {
     path: '/vision',
     route: VisionRoutes,
+  },
+  {
+    path: '/video',
+    route: VideoRoutes,
   },
 ];
 

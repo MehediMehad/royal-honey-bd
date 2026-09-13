@@ -140,6 +140,13 @@ const extractMessagesFromPayload = (
                     (waMsg.image?.id
                       ? `https://graph.facebook.com/v21.0/${waMsg.image.id}`
                       : undefined);
+                } else if (waMsg.type === 'video') {
+                  mediaType = 'VIDEO';
+                  mediaUrl =
+                    waMsg.video?.link ||
+                    (waMsg.video?.id
+                      ? `https://graph.facebook.com/v21.0/${waMsg.video.id}`
+                      : undefined);
                 }
 
                 messages.push({
@@ -148,7 +155,11 @@ const extractMessagesFromPayload = (
                   messageId: waId || `wa_${Date.now()}`,
                   content:
                     textBody ||
-                    (mediaType === 'AUDIO' ? '[Voice Message]' : `[${waMsg.type || 'Media'} Sent]`),
+                    (mediaType === 'AUDIO'
+                      ? '[Voice Message]'
+                      : mediaType === 'VIDEO'
+                        ? '[Video Message]'
+                        : `[${waMsg.type || 'Media'} Sent]`),
                   senderName: contactName,
                   mediaUrl,
                   mediaType,

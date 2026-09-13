@@ -95,9 +95,13 @@ const saveCustomerMessage = async (
   let msgType = messageType;
   if (!msgType) {
     if (mediaUrl) {
-      msgType = mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i)
-        ? MessageType.AUDIO
-        : MessageType.IMAGE;
+      if (mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i)) {
+        msgType = MessageType.AUDIO;
+      } else if (mediaUrl.match(/\.(mp4|webm|mov|mkv|avi|3gp)/i)) {
+        msgType = MessageType.VIDEO;
+      } else {
+        msgType = MessageType.IMAGE;
+      }
     } else {
       msgType = MessageType.TEXT;
     }

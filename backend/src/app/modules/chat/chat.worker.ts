@@ -10,6 +10,7 @@ import { OrderServices } from '../order/order.service';
 import { CourierServices } from '../courier/courier.service';
 import { VoiceServices } from '../voice/voice.service';
 import { VisionServices } from '../vision/vision.service';
+import { VideoServices } from '../video/video.service';
 import { ProductServices } from '../products/product.service';
 import { OrderAlerts } from '../order/order.alert';
 import { AiAgent } from './ai.agent';
@@ -28,19 +29,23 @@ export const setupChatWorker = () => {
       const { customer, conversation } =
         await ChatServices.getOrCreateCustomerAndConversation(job.data);
 
-      // 2. Detect & Transcribe Voice Messages (Phase 7: Bangla STT)
+      // 2. Detect Media Types
       const isVoiceMessage =
         mediaType === 'AUDIO' ||
         (mediaUrl && !!mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i));
 
-      // 2.1 Detect & Analyze Images (Phase 8: Multi-Modal Vision & Payment OCR)
+      const isVideoMessage =
+        mediaType === 'VIDEO' ||
+        (mediaUrl && !isVoiceMessage && !!mediaUrl.match(/\.(mp4|webm|mov|mkv|avi|3gp)/i));
+
       const isImageMessage =
         mediaType === 'IMAGE' ||
-        (mediaUrl && !isVoiceMessage && !mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus)/i));
+        (mediaUrl && !isVoiceMessage && !isVideoMessage && !mediaUrl.match(/\.(ogg|mp3|wav|m4a|aac|opus|mp4|webm|mov|mkv|avi|3gp)/i));
 
       let processedText = content;
       let isAmbiguousVoice = false;
       let visionResult: any = null;
+      let videoResult: any = null;
 
       if (isVoiceMessage && mediaUrl) {
         console.log(`🎙️ [ChatWorker] Transcribing customer voice message from ${mediaUrl}...`);
@@ -76,6 +81,39 @@ export const setupChatWorker = () => {
             processedText,
             mediaUrl,
             MessageType.AUDIO,
+          );
+        }
+      } else if (isVideoMessage && mediaUrl) {
+        console.log(`🎥 [ChatWorker] Analyzing customer video from ${mediaUrl}...`);
+        try {
+          videoResult = await VideoServices.analyzeCustomerVideo({
+            videoUrl: mediaUrl,
+            channel,
+          });
+          console.log(`🎥 [ChatWorker] Video analyzed: Speech="${videoResult.speechTranscript}", Damaged=${videoResult.isDamaged}`);
+
+          if (videoResult.speechTranscript) {
+            processedText = videoResult.speechTranscript;
+          } else if (videoResult.visualSummary) {
+            processedText = `[ভিডিওতে প্রদর্শিত দৃশ্য: ${videoResult.visualSummary}]`;
+          } else {
+            processedText = content || '[ভিডিও মেসেজ]';
+          }
+
+          await ChatServices.saveCustomerMessage(
+            conversation.id,
+            content ? `${content}\n${videoResult.combinedContext}` : videoResult.combinedContext,
+            mediaUrl,
+            MessageType.VIDEO,
+            { video: videoResult },
+          );
+        } catch (videoErr: any) {
+          console.error('❌ [ChatWorker] Video processing error:', videoErr?.message || videoErr);
+          await ChatServices.saveCustomerMessage(
+            conversation.id,
+            content || '[ভিডিও মেসেজ]',
+            mediaUrl,
+            MessageType.VIDEO,
           );
         }
       } else if (isImageMessage && mediaUrl) {
@@ -130,10 +168,10 @@ export const setupChatWorker = () => {
         };
       }
 
-      // 3.2 Vision Branch: Damaged Jar / Packaging Complaint (Section 30)
-      if (visionResult?.imageCategory === 'COMPLAINT_DAMAGE') {
+      // 3.2 Video / Vision Branch: Damaged Jar / Packaging Complaint (Section 30)
+      if (videoResult?.isDamaged || visionResult?.imageCategory === 'COMPLAINT_DAMAGE') {
         const damageReply =
-          'আপনার পাঠানো ছবিটি আমরা দেখেছি। পার্সেল ক্ষতিগ্রস্ত বা ভাঙা হওয়ার জন্য আমরা আন্তরিকভাবে দুঃখিত!\n\nRoyal Honey BD-এর নিয়ম অনুযায়ী ডেলিভারিতে পার্সেল বা বয়াম ক্ষতিগ্রস্ত হলে আমরা সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দিই।\n\nবিষয়টি এখনই অগ্রাধিকার ভিত্তিতে আমাদের সাপোর্ট টিম ও ওনারের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের একজন প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।\n\nজরুরি প্রয়োজনে হেল্পলাইনেও সরাসরি যোগাযোগ করতে পারেন: 01604121107 ❤️';
+          'আপনার পাঠানো ভিডিও/ছবিটি আমরা পর্যালোচনা করেছি। পার্সেল বা মধুর বয়াম ক্ষতিগ্রস্ত হওয়ার জন্য আমরা আন্তরিকভাবে দুঃখিত!\n\nRoyal Honey BD-এর নিয়ম অনুযায়ী ডেলিভারিতে পার্সেল বা বয়াম ক্ষতিগ্রস্ত হলে আমরা সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দিই।\n\nবিষয়টি এখনই অগ্রাধিকার ভিত্তিতে আমাদের সাপোর্ট টিম ও ওনারের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের একজন প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।\n\nজরুরি প্রয়োজনে হেল্পলাইনেও সরাসরি যোগাযোগ করতে পারেন: 01604121107 ❤️';
 
         await ChatServices.takeoverConversation(conversation.id);
         await ChatServices.saveAiMessage(conversation.id, damageReply);
@@ -145,7 +183,32 @@ export const setupChatWorker = () => {
         };
       }
 
-      // 3.3 Vision Branch: Unclear / Blurry Image
+      // 3.3 Video Branch: Silent / Unclear Video without text
+      if (videoResult?.isUnclear && (!content || !content.trim())) {
+        const unclearReply =
+          'আপনার পাঠানো ভিডিওটিতে কোনো স্পষ্ট বক্তব্য বা বিষয় বোঝা যায়নি। অনুগ্রহ করে কী উদ্দেশ্যে ভিডিওটি পাঠিয়েছেন তা একটু লিখে বা স্পষ্ট করে জানান ❤️';
+        await ChatServices.saveAiMessage(conversation.id, unclearReply);
+        await MessageSender.dispatchReply(channel, channelId, unclearReply);
+        return {
+          status: 'completed',
+          reason: 'unclear_video_reply',
+          conversationId: conversation.id,
+        };
+      }
+
+      // 3.4 Video Branch: Product Inquiry via Video
+      if (videoResult?.detectedProduct && (!content || !content.trim()) && !videoResult.speechTranscript) {
+        const prodReply = `ধন্যবাদ! আপনার ভিডিওতে প্রদর্শিত পণ্যটি আমাদের "${videoResult.detectedProduct}"।\n\n💰 এটি অর্ডার করতে চাইলে আপনার ডেলিভারি ঠিকানা এবং কয়টি জার প্রয়োজন লিখে বা ভয়েসে জানান ❤️`;
+        await ChatServices.saveAiMessage(conversation.id, prodReply);
+        await MessageSender.dispatchReply(channel, channelId, prodReply);
+        return {
+          status: 'completed',
+          reason: 'product_inquiry_from_video',
+          conversationId: conversation.id,
+        };
+      }
+
+      // 3.5 Vision Branch: Unclear / Blurry Image
       if (visionResult?.imageCategory === 'UNCLEAR') {
         const unclearReply =
           'আপনার পাঠানো ছবিটি পরিষ্কারভাবে বোঝা যাচ্ছে না। অনুগ্রহ করে একটু স্পষ্ট ছবি অথবা আপনি কী জানতে বা অর্ডার করতে চান তা লিখে জানান ❤️';

@@ -1,15 +1,23 @@
 import { z } from 'zod';
 
 const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  body: z.object({
+    email: z.string().email('অনুগ্রহ করে একটি সঠিক ইমেইল অ্যাড্রেস দিন'),
+    password: z.string().min(6, 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে'),
+  }),
 });
 
 const refreshTokenSchema = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
+  cookies: z
+    .object({
+      refreshToken: z.string().optional(),
+    })
+    .optional(),
 });
 
 export const AuthValidations = {
   loginSchema,
   refreshTokenSchema,
 };
+
+export const AuthValidation = AuthValidations;

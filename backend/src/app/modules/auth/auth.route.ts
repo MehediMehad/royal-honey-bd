@@ -4,10 +4,13 @@ import validateRequest from '../../middlewares/validateRequest';
 import { AuthControllers } from './auth.controller';
 import { AuthValidations } from './auth.validation';
 
+import { authLimiter } from '../../middlewares/rateLimiter';
+
 const router = express.Router();
 
 router.post(
   '/login',
+  authLimiter,
   validateRequest(AuthValidations.loginSchema),
   AuthControllers.loginAdmin,
 );

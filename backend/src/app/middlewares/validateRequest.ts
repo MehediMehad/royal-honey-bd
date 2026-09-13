@@ -1,23 +1,22 @@
-import type { NextFunction, Request, Response } from 'express';
-import type { z } from 'zod';
+import type { Request, Response, NextFunction } from 'express';
+import type { ZodTypeAny } from 'zod';
 
-const validateRequest =
-  (schema: z.ZodTypeAny) =>
-    async (req: Request, _res: Response, next: NextFunction) => {
-      try {
-        let data = req.body?.data ?? req.body;
-
-        if (typeof data === 'string') {
-          data = JSON.parse(data);
-        }
-
-        await schema.parseAsync(data);
-        req.body = data;
-        next();
-      } catch (err) {
-        next(err);
-      }
-    };
+/**
+ * Express middleware to validate request body, query, and params against Zod schemas
+ */
+export const validateRequest = (schema: ZodTypeAny) => {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await schema.parseAsync({
+        body: req.body,
+        query: req.query,
+        params: req.params,
+      });
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+};
 
 export default validateRequest;
-

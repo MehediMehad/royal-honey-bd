@@ -1,0 +1,95 @@
+name: Royal Honey BD CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-typecheck:
+    name: Lint & Typecheck (Backend & Frontend)
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install & Compile Backend
+        run: |
+          cd backend
+          npm ci
+          npm run prisma:generate
+          npm run build
+
+      - name: Install & Compile Frontend
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  docker-build:
+    name: Build Docker Images
+    needs: test-and-typecheck
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: royal-honey-backend:latest
+
+      - name: Build Frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: royal-honey-frontend:latest
+
+  deploy:
+    name: Zero-Downtime Production Deployment
+    needs: docker-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy via SSH to Production Server
+        uses: appleboy/ssh-action@v1.0.3
+        if: ${{ secrets.PROD_SERVER_HOST != '' }}
+        with:
+          host: ${{ secrets.PROD_SERVER_HOST }}
+          username: ${{ secrets.PROD_SERVER_USER }}
+          key: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/royal-honey-bd
+            git pull origin main
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker image prune -af --filter "until=24h"
+            echo "✅ Production Deployment Completed Successfully!"

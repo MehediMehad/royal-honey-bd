@@ -4,14 +4,19 @@ import { ZodError } from 'zod';
 import ApiError from './ApiError';
 import handleZodError from './handleZodError';
 import handlePrismaValidationError from './prismaErrorParser';
+import { logger } from '../libs/logger';
 
 const globalErrorHandler = (
   err: any,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction,
 ) => {
-  console.error('❌ Error caught in globalErrorHandler:', err);
+  logger.captureException(err, {
+    path: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+  });
 
   let statusCode = 500;
   let message = 'Something went wrong!';

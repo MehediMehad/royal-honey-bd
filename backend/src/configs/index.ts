@@ -33,6 +33,7 @@ const config = {
   },
   meta: {
     verifyToken: getEnvVar('META_VERIFY_TOKEN', 'royal_honey_verify_token'),
+    appSecret: getEnvVar('META_APP_SECRET', ''),
     pageAccessToken: getEnvVar('META_PAGE_ACCESS_TOKEN', ''),
     whatsappToken: getEnvVar('WHATSAPP_ACCESS_TOKEN', ''),
     whatsappPhoneId: getEnvVar('WHATSAPP_PHONE_NUMBER_ID', ''),

@@ -8,6 +8,8 @@ import config from './configs';
 import globalErrorHandler from './app/errors/globalErrorHandler';
 import router from './routes';
 
+import { apiLimiter } from './app/middlewares/rateLimiter';
+
 const app: Application = express();
 
 // HTTP Logging
@@ -27,8 +29,15 @@ app.use(
   }),
 );
 
-// Body parser
-app.use(express.json({ limit: '10mb' }));
+// Body parser with rawBody capture for cryptographic signature verification (Meta Webhook HMAC)
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health check
@@ -40,8 +49,8 @@ app.get('/', (_req: Request, res: Response) => {
   });
 });
 
-// API Routes
-app.use('/api/v1', router);
+// API Routes with rate limiting
+app.use('/api/v1', apiLimiter, router);
 
 // Global Error Handler
 app.use(globalErrorHandler);

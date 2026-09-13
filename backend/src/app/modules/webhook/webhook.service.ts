@@ -1,5 +1,6 @@
 import config from '../../../configs';
 import { chatMessageQueue } from '../../libs/queue';
+import { acquireMessageLock } from '../../libs/idempotency';
 import type {
   IMetaWebhookPayload,
   IMetaWebhookQuery,
@@ -183,7 +184,20 @@ const processIncomingWebhook = async (payload: IMetaWebhookPayload) => {
     return { queued: 0, message: 'No actionable messages extracted' };
   }
 
-  const jobPromises = messages.map((msg) =>
+  // Deduplicate messages using Redis distributed lock
+  const validMessages: INormalizedIncomingMessage[] = [];
+  for (const msg of messages) {
+    const isNew = await acquireMessageLock(`${msg.channel}_${msg.messageId}`);
+    if (isNew) {
+      validMessages.push(msg);
+    }
+  }
+
+  if (validMessages.length === 0) {
+    return { queued: 0, message: 'All incoming messages were deduplicated (already processed)' };
+  }
+
+  const jobPromises = validMessages.map((msg) =>
     chatMessageQueue.add(
       'process-chat-message',
       msg,
@@ -196,8 +210,8 @@ const processIncomingWebhook = async (payload: IMetaWebhookPayload) => {
   await Promise.all(jobPromises);
 
   return {
-    queued: messages.length,
-    message: `Successfully enqueued ${messages.length} message(s) to BullMQ`,
+    queued: validMessages.length,
+    message: `Successfully enqueued ${validMessages.length} message(s) to BullMQ`,
   };
 };
 

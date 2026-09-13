@@ -63,10 +63,16 @@ export default function AdminInboxPage() {
     try {
       const res = await chatService.getMessages(convId);
       if (res.success && res.data) {
-        setMessages(res.data);
+        const msgList = Array.isArray(res.data)
+          ? res.data
+          : (res.data as { messages?: Message[] }).messages || [];
+        setMessages(msgList);
+      } else {
+        setMessages([]);
       }
     } catch (err) {
       console.error("Failed to load messages", err);
+      setMessages([]);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -85,7 +91,7 @@ export default function AdminInboxPage() {
 
       const handleNewMessage = (msg: Message) => {
         if (msg.conversationId === activeConvId) {
-          setMessages((prev) => [...prev, msg]);
+          setMessages((prev) => [...(Array.isArray(prev) ? prev : []), msg]);
         }
         // Update last message in conversation list
         setConversations((prev) =>
@@ -172,7 +178,7 @@ export default function AdminInboxPage() {
     try {
       const res = await chatService.sendReply(activeConvId, text);
       if (res.success && res.data?.data) {
-        setMessages((prev) => [...prev, res.data.data]);
+        setMessages((prev) => [...(Array.isArray(prev) ? prev : []), res.data.data]);
         // Also update local status to HUMAN_TAKEOVER
         setConversations((prev) =>
           prev.map((c) =>
@@ -425,7 +431,7 @@ export default function AdminInboxPage() {
               <div className="py-20 text-center text-xs text-muted-foreground animate-pulse">
                 Loading messages...
               </div>
-            ) : messages.length === 0 ? (
+            ) : !Array.isArray(messages) || messages.length === 0 ? (
               <div className="py-20 text-center text-xs text-muted-foreground">
                 No message history yet.
               </div>

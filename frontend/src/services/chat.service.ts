@@ -7,8 +7,12 @@ export const chatService = {
     return apiClient.get<Conversation[]>(API_ENDPOINTS.CHAT.CONVERSATIONS);
   },
 
-  async getMessages(conversationId: string): Promise<ApiResponse<Message[]>> {
-    return apiClient.get<Message[]>(API_ENDPOINTS.CHAT.MESSAGES(conversationId));
+  async getMessages(
+    conversationId: string
+  ): Promise<
+    ApiResponse<{ conversation: Conversation; messages: Message[] } | Message[]>
+  > {
+    return apiClient.get(API_ENDPOINTS.CHAT.MESSAGES(conversationId));
   },
 
   async takeover(conversationId: string): Promise<ApiResponse<{ message: string }>> {

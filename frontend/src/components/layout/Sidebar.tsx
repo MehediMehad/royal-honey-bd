@@ -43,7 +43,7 @@ const royalHoneyNavItems = [
     badge: "BI",
   },
   {
-    title: "Live Chat & Takeover",
+    title: "Live Chat",
     href: "/admin/inbox",
     icon: MessageSquare,
     badge: "Live",

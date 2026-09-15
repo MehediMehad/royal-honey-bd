@@ -56,6 +56,8 @@ export interface Customer {
   linkedChannels?: CustomerChannel[];
   cartItemsCount?: number;
   cartTotal?: number;
+  ordersCount?: number;
+  hasOrdered?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -107,6 +109,19 @@ export interface Message {
   createdAt: string;
 }
 
+export interface ConversationStats {
+  total: number;
+  unreplied: number;
+  ordered: number;
+  incompleteCart: number;
+  takeover: number;
+  aiActive: number;
+  messenger: number;
+  whatsapp: number;
+  instagram: number;
+  website: number;
+}
+
 export interface Conversation {
   id: string;
   customerId: string;
@@ -115,8 +130,27 @@ export interface Conversation {
   lastMessageAt: string;
   createdAt: string;
   updatedAt: string;
+  isUnreplied?: boolean;
+  hasOrdered?: boolean;
+  hasActiveCart?: boolean;
+  ordersCount?: number;
   customer: Customer;
   messages?: Message[];
+  lastMessage?: {
+    sender: SenderType;
+    content: string;
+    createdAt: string;
+  } | null;
+  humanHandoff?: {
+    status: string;
+    reason?: string | null;
+    assignedAdmin?: string | null;
+  } | null;
+}
+
+export interface ConversationsApiResponse {
+  conversations: Conversation[];
+  stats: ConversationStats;
 }
 
 export interface KnowledgeItem {

@@ -1,10 +1,26 @@
 import { apiClient } from "@/lib/api";
 import { API_ENDPOINTS } from "@/lib/constants";
-import { ApiResponse, Conversation, Message } from "@/types";
+import { ApiResponse, Conversation, ConversationsApiResponse, Message } from "@/types";
+
+export interface GetConversationsParams {
+  channel?: string;
+  category?: string;
+  status?: string;
+  searchTerm?: string;
+}
 
 export const chatService = {
-  async getConversations(): Promise<ApiResponse<Conversation[]>> {
-    return apiClient.get<Conversation[]>(API_ENDPOINTS.CHAT.CONVERSATIONS);
+  async getConversations(
+    params?: GetConversationsParams
+  ): Promise<ApiResponse<ConversationsApiResponse | Conversation[]>> {
+    const searchParams = new URLSearchParams();
+    if (params?.channel && params.channel !== "ALL") searchParams.set("channel", params.channel);
+    if (params?.category && params.category !== "ALL") searchParams.set("category", params.category);
+    if (params?.status && params.status !== "ALL") searchParams.set("status", params.status);
+    if (params?.searchTerm) searchParams.set("searchTerm", params.searchTerm);
+
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    return apiClient.get(API_ENDPOINTS.CHAT.CONVERSATIONS + query);
   },
 
   async getMessages(

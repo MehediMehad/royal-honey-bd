@@ -7,7 +7,7 @@ import ApiError from '../../errors/ApiError';
 import { ChatServices } from './chat.service';
 
 const getAllConversations = catchAsync(async (req: Request, res: Response) => {
-  const filters = pick(req.query, ['status', 'channel', 'searchTerm']);
+  const filters = pick(req.query, ['status', 'channel', 'category', 'searchTerm']);
   const result = await ChatServices.getAllConversations(filters as any);
 
   sendResponse(res, {

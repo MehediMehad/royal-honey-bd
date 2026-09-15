@@ -153,11 +153,12 @@ const saveAiMessage = async (conversationId: string, content: string) => {
 };
 
 /**
- * Get all conversations with customer profile, status, and last message
+ * Get all conversations with customer profile, status, last message, and aggregate stats
  */
 const getAllConversations = async (filters: {
   status?: ConversationStatus;
   channel?: CustomerChannelEnum;
+  category?: 'ALL' | 'UNREPLIED' | 'ORDERED' | 'INCOMPLETE_CART' | 'TAKEOVER' | 'AI_ACTIVE';
   searchTerm?: string;
 }) => {
   const where: any = {};
@@ -180,6 +181,9 @@ const getAllConversations = async (filters: {
       customer: {
         include: {
           channelUsers: true,
+          orders: {
+            select: { id: true, orderStatus: true, totalAmount: true },
+          },
           carts: {
             orderBy: { updatedAt: 'desc' },
             take: 1,
@@ -202,16 +206,24 @@ const getAllConversations = async (filters: {
     },
   });
 
-  return conversations.map((conv) => {
+  const mapped = conversations.map((conv) => {
     const lastMsg = conv.messages[0];
     const latestHandoff = conv.humanHandoffs[0];
     const activeCart = conv.customer.carts[0];
+    const ordersCount = conv.customer.orders?.length || 0;
+    const hasOrdered = ordersCount > 0;
+    const isUnreplied = !!lastMsg && lastMsg.sender === SenderType.CUSTOMER;
+    const hasActiveCart = (activeCart?.items?.length || 0) > 0;
 
     return {
       id: conv.id,
       channel: conv.channel,
       status: conv.status,
       lastMessageAt: conv.lastMessageAt,
+      isUnreplied,
+      hasOrdered,
+      hasActiveCart,
+      ordersCount,
       customer: {
         id: conv.customer.id,
         name: conv.customer.name,
@@ -220,6 +232,8 @@ const getAllConversations = async (filters: {
         thana: conv.customer.thana,
         fullAddress: conv.customer.fullAddress,
         linkedChannels: conv.customer.channelUsers?.map((cu) => cu.channel) || [],
+        ordersCount,
+        hasOrdered,
         cartItemsCount: activeCart?.items?.length || 0,
         cartTotal: (activeCart?.items || []).reduce(
           (sum, item) => sum + item.quantity * item.unitPrice,
@@ -242,6 +256,37 @@ const getAllConversations = async (filters: {
         : null,
     };
   });
+
+  const stats = {
+    total: mapped.length,
+    unreplied: mapped.filter((c) => c.isUnreplied).length,
+    ordered: mapped.filter((c) => c.hasOrdered).length,
+    incompleteCart: mapped.filter((c) => c.hasActiveCart && !c.hasOrdered).length,
+    takeover: mapped.filter((c) => c.status === ConversationStatus.HUMAN_TAKEOVER).length,
+    aiActive: mapped.filter((c) => c.status === ConversationStatus.AI_ACTIVE).length,
+    messenger: mapped.filter((c) => c.channel === CustomerChannelEnum.FACEBOOK).length,
+    whatsapp: mapped.filter((c) => c.channel === CustomerChannelEnum.WHATSAPP).length,
+    instagram: 0,
+    website: 0,
+  };
+
+  let filtered = mapped;
+  if (filters.category === 'UNREPLIED') {
+    filtered = mapped.filter((c) => c.isUnreplied);
+  } else if (filters.category === 'ORDERED') {
+    filtered = mapped.filter((c) => c.hasOrdered);
+  } else if (filters.category === 'INCOMPLETE_CART') {
+    filtered = mapped.filter((c) => c.hasActiveCart && !c.hasOrdered);
+  } else if (filters.category === 'TAKEOVER') {
+    filtered = mapped.filter((c) => c.status === ConversationStatus.HUMAN_TAKEOVER);
+  } else if (filters.category === 'AI_ACTIVE') {
+    filtered = mapped.filter((c) => c.status === ConversationStatus.AI_ACTIVE);
+  }
+
+  return {
+    conversations: filtered,
+    stats,
+  };
 };
 
 /**

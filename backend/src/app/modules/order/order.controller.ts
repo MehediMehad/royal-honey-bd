@@ -20,9 +20,11 @@ const createDirectOrder = catchAsync(async (req: Request, res: Response) => {
 const getAllOrders = catchAsync(async (req: Request, res: Response) => {
   const filters = pick(req.query, [
     'orderStatus',
+    'status',
     'paymentStatus',
     'paymentMethod',
     'searchTerm',
+    'search',
     'page',
     'limit',
     'sortBy',
@@ -79,8 +81,9 @@ const verifyAdvancePayment = catchAsync(async (req: Request, res: Response) => {
 
 const updateOrderStatus = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const { orderStatus, notes } = req.body;
-  const result = await OrderServices.updateOrderStatus(id, orderStatus, notes);
+  const status = req.body.status || req.body.orderStatus;
+  const { notes } = req.body;
+  const result = await OrderServices.updateOrderStatus(id, status, notes);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

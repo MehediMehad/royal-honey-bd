@@ -363,15 +363,31 @@ const getAllOrders = async (filters: IOrderFilterQuery) => {
   const where: Prisma.OrderWhereInput = {};
 
   if (orderStatus) where.orderStatus = orderStatus;
+  const actualStatus = filters.orderStatus || (filters as any).status;
+  const actualSearch = filters.searchTerm || (filters as any).search;
+
+  if (actualStatus) {
+    if (
+      actualStatus === 'VERIFICATION_PENDING' ||
+      actualStatus === 'PAYMENT_VERIFICATION_PENDING'
+    ) {
+      where.orderStatus = OrderStatus.PAYMENT_VERIFICATION_PENDING;
+    } else {
+      where.orderStatus = actualStatus as OrderStatus;
+    }
+  }
+
   if (paymentStatus) where.paymentStatus = paymentStatus;
   if (paymentMethod) where.paymentMethod = paymentMethod;
 
-  if (searchTerm) {
+  const searchValue = searchTerm || actualSearch;
+
+  if (searchValue) {
     where.OR = [
-      { id: { contains: searchTerm, mode: 'insensitive' } },
-      { transactionId: { contains: searchTerm, mode: 'insensitive' } },
-      { customer: { name: { contains: searchTerm, mode: 'insensitive' } } },
-      { customer: { phone: { contains: searchTerm, mode: 'insensitive' } } },
+      { id: { contains: searchValue, mode: 'insensitive' } },
+      { transactionId: { contains: searchValue, mode: 'insensitive' } },
+      { customer: { name: { contains: searchValue, mode: 'insensitive' } } },
+      { customer: { phone: { contains: searchValue, mode: 'insensitive' } } },
     ];
   }
 

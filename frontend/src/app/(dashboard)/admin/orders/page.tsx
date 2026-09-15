@@ -49,6 +49,12 @@ export default function AdminOrdersPage() {
     try {
       const params: { status?: string; search?: string } = {};
       if (statusFilter !== "ALL") params.status = statusFilter;
+      if (statusFilter !== "ALL") {
+        params.status =
+          statusFilter === "VERIFICATION_PENDING"
+            ? "PAYMENT_VERIFICATION_PENDING"
+            : statusFilter;
+      }
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const res = await orderService.getAllOrders(params);
@@ -124,6 +130,14 @@ export default function AdminOrdersPage() {
   };
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    // Optimistically update order status immediately
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, orderStatus: newStatus } : o))
+    );
+    if (selectedOrder && selectedOrder.id === orderId) {
+      setSelectedOrder({ ...selectedOrder, orderStatus: newStatus });
+    }
+
     try {
       const res = await orderService.updateStatus(orderId, newStatus);
       if (res.success) {
@@ -135,6 +149,7 @@ export default function AdminOrdersPage() {
       }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Status update failed");
+      fetchOrders();
     }
   };
 

@@ -25,17 +25,26 @@ const createOrderZodSchema = z.object({
   }),
 });
 
+const orderStatusEnum = z.enum([
+  'PENDING',
+  'PAYMENT_VERIFICATION_PENDING',
+  'CONFIRMED',
+  'PROCESSING',
+  'SHIPPED',
+  'DELIVERED',
+  'CANCELLED',
+]);
+
 const updateOrderStatusZodSchema = z.object({
-  body: z.object({
-    status: z.enum([
-      'PENDING',
-      'PAYMENT_VERIFICATION_PENDING',
-      'CONFIRMED',
-      'SHIPPED',
-      'DELIVERED',
-      'CANCELLED',
-    ]),
-  }),
+  body: z
+    .object({
+      status: orderStatusEnum.optional(),
+      orderStatus: orderStatusEnum.optional(),
+      notes: z.string().optional(),
+    })
+    .refine((data) => !!(data.status || data.orderStatus), {
+      message: 'status অথবা orderStatus প্রদান করুন',
+    }),
 });
 
 const verifyPaymentZodSchema = z.object({

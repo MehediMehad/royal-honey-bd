@@ -394,12 +394,12 @@ export const setupChatWorker = () => {
       }
       // Case 8.2: Customer explicitly confirms the order
       else if (hasAllDetails && extracted.isOrderConfirmed) {
-        // If customer wants advance payment but hasn't sent TrxID yet
+        const customerGreeting = session.name ? `${session.name} ভাইয়া` : 'ভাইয়া';
         if (
           (extracted.paymentMethod === 'BKASH' || extracted.paymentMethod === 'NAGAD') &&
           !extracted.transactionId
         ) {
-          aiReply = `ধন্যবাদ ${session.name || ''}! অনুগ্রহ করে আমাদের ${extracted.paymentMethod === 'NAGAD' ? 'নগদ' : 'বিকাশ'} নম্বরে মোট ৳${session.cart.finalTotal} পাঠিয়ে TrxID অথবা পেমেন্টের স্ক্রিনশট দিন:\n\n📱 বিকাশ / নগদ (Personal): 01604121107\n💰 মোট প্রদেয়: ৳${session.cart.finalTotal}\n\nটাকা পাঠিয়ে TrxID লিখলেই বা স্ক্রিনশট দিলেই সাথে সাথে আপনার অর্ডারটি ভেরিফিকেশন ও কনফার্মেশনের জন্য গ্রহণ করা হবে।`;
+          aiReply = `ধন্যবাদ ${customerGreeting}! অনুগ্রহ করে আমাদের ${extracted.paymentMethod === 'NAGAD' ? 'নগদ' : 'বিকাশ'} নম্বরে মোট ৳${session.cart.finalTotal} পাঠিয়ে TrxID অথবা পেমেন্টের স্ক্রিনশট দিন:\n\n📱 বিকাশ / নগদ (Personal): 01604121107\n💰 মোট প্রদেয়: ৳${session.cart.finalTotal}\n\nটাকা পাঠানো হলে TrxID লিখে দিলেই বা স্ক্রিনশট পাঠালেই সাথে সাথে আমরা ভেরিফাই করে আপনার অর্ডারটি কনফার্ম করে দেব ভাইয়া। 😊`;
         } else {
           // Cash on Delivery (COD) order confirmation
           try {
@@ -420,10 +420,18 @@ export const setupChatWorker = () => {
               console.warn('⚠️ Auto courier booking failed:', courierErr);
             }
 
-            aiReply = `✅ আপনার অর্ডারটি সফলভাবে Confirm করা হয়েছে!\n\n📦 Order ID: ${order.id}${trackingInfo}\n💰 মোট Payable: ৳${order.totalAmount} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${session.fullAddress || customer.fullAddress}, ${session.district || customer.district}\n\nআমাদের পক্ষ থেকে পার্সেলটি দ্রুত কুরিয়ারে হস্তান্তর করা হবে। Royal Honey BD-এর সাথে থাকার জন্য ধন্যবাদ ❤️`;
+            const customerGreeting = session.name ? `${session.name} ভাইয়া` : 'ভাইয়া';
+            const isDhaka =
+              session.district?.toLowerCase().includes('dhaka') ||
+              session.district?.includes('ঢাকা');
+            const deliveryTimeline = isDhaka
+              ? 'ঢাকার ভেতরে ইনশাআল্লাহ ১-২ কার্যদিবসের মধ্যে'
+              : 'ঢাকার বাইরে ইনশাআল্লাহ ২-৪ কার্যদিবসের মধ্যে';
+
+            aiReply = `আলহামদুলিল্লাহ ${customerGreeting}! আপনার অর্ডারটি সফলভাবে কনফার্ম করেছি। ❤️\n\n📦 অর্ডার আইডি: #${order.id}${trackingInfo}\n💰 মোট বিল: ৳${order.totalAmount} (ক্যাশ অন ডেলিভারি)\n📍 ডেলিভারি ঠিকানা: ${session.fullAddress || customer.fullAddress}, ${session.district || customer.district}\n\n${deliveryTimeline} ডেলিভারিম্যান আপনার সাথে যোগাযোগ করে পার্সেলটি পৌঁছে দেবে। ডেলিভারির সময় পণ্য হাতে পেয়ে মূল্য পরিশোধ করতে পারবেন।\n\nRoyal Honey BD-এর সাথে থাকার জন্য অসংখ্য ধন্যবাদ! কোনো প্রশ্ন থাকলে নির্দ্বিধায় জানাবেন। 😊`;
           } catch (err: any) {
             console.error('❌ Order placement failed for COD:', err?.message || err);
-            aiReply = `দুঃখিত! ${err?.message || 'অর্ডার সম্পন্ন করা সম্ভব হয়নি।'} অনুগ্রহ করে হেল্পলাইনে যোগাযোগ করুন।`;
+            aiReply = `দুঃখিত ভাইয়া! এই মুহূর্তে অর্ডার সম্পন্ন করতে একটু সমস্যা হয়েছে। অনুগ্রহ করে আমাদের হেল্পলাইনে (01604121107) একটু জানান, আমরা ঠিক করে দিচ্ছি।`;
           }
         }
       }

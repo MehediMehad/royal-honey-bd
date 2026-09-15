@@ -1,0 +1,407 @@
+{
+  "name": "Royal Honey BD — Complete AI Automation & Sync Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "royal-honey-events",
+        "options": {}
+      },
+      "id": "webhook-royal-honey-events",
+      "name": "Royal Honey Events Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "GOOGLE_SHEET_BACKUP",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Google Sheet Backup"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "ADVANCE_PAYMENT_PENDING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Payment Pending Alert"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "ORDER_CONFIRMED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Order Confirmed Alert"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "LOW_STOCK_ALERT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Low Stock Alert"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "HUMAN_HANDOFF",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Human Handoff Alert"
+            }
+          ]
+        }
+      },
+      "id": "switch-events",
+      "name": "Classify Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_DOCUMENT_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Royal Honey BD Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order ID": "={{ $json.body.row.orderId }}",
+            "Consignment ID": "={{ $json.body.row.consignmentId }}",
+            "Tracking Code": "={{ $json.body.row.trackingCode }}",
+            "Date Time": "={{ $json.body.row.dateTime }}",
+            "Customer Name": "={{ $json.body.row.customerName }}",
+            "Phone Number": "={{ $json.body.row.phoneNumber }}",
+            "District": "={{ $json.body.row.district }}",
+            "Thana": "={{ $json.body.row.thana }}",
+            "Delivery Address": "={{ $json.body.row.deliveryAddress }}",
+            "Ordered Products": "={{ $json.body.row.orderedProducts }}",
+            "Product Total": "={{ $json.body.row.productTotal }}",
+            "Delivery Charge": "={{ $json.body.row.deliveryCharge }}",
+            "Total Payable": "={{ $json.body.row.totalPayable }}",
+            "Payment Method": "={{ $json.body.row.paymentMethod }}",
+            "Payment Status": "={{ $json.body.row.paymentStatus }}",
+            "Transaction ID": "={{ $json.body.row.transactionId }}",
+            "Courier Status": "={{ $json.body.row.courierStatus }}",
+            "Order Status": "={{ $json.body.row.orderStatus }}",
+            "Source Channel": "={{ $json.body.row.sourceChannel }}"
+          },
+          "matchingColumns": [
+            "Order ID"
+          ]
+        },
+        "options": {}
+      },
+      "id": "google-sheet-append",
+      "name": "Append to Google Sheets (Backup)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [750, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_META_WHATSAPP_ACCESS_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"01604121107\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"🚨 নতুন অগ্রিম পেমেন্ট ভেরিফিকেশন পেন্ডিং!\\n\\nঅর্ডার আইডি: \" + $json.body.orderId + \"\\nকাস্টমার: \" + $json.body.customerName + \" (\" + $json.body.customerPhone + \")\\nপেমেন্ট মেথড: \" + $json.body.paymentMethod + \"\\nটাকার পরিমাণ: ৳\" + $json.body.amount + \"\\nTrxID: \" + ($json.body.transactionId || 'স্ক্রিনশট পাঠানো হয়েছে') + \"\\n\\n👉 ভেরিফাই করতে ড্যাশবোর্ড দেখুন: \" + ($json.body.takeoverUrl || 'http://localhost:3000/admin/orders')\n  }\n}"
+      },
+      "id": "whatsapp-payment-pending",
+      "name": "WhatsApp Alert: Payment Verification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_META_WHATSAPP_ACCESS_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"01604121107\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"🎉 নতুন কনফার্মড অর্ডার! 🍯\\n\\nঅর্ডার আইডি: \" + $json.body.orderId + \"\\nকাস্টমার: \" + $json.body.customerName + \" (\" + $json.body.customerPhone + \")\\nমোট টাকা: ৳\" + $json.body.totalAmount + \" (\" + $json.body.paymentMethod + \")\\nকুরিয়ার ট্র্যাকিং: \" + ($json.body.courierTrackingId || 'Booked') + \"\\n\\nপণ্য তালিকা:\\n\" + JSON.stringify($json.body.items, null, 2)\n  }\n}"
+      },
+      "id": "whatsapp-order-confirmed",
+      "name": "WhatsApp Alert: Order Confirmed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_META_WHATSAPP_ACCESS_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"01604121107\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"⚠️ জরুরি লো-স্টক অ্যালার্ট! 📦\\n\\nপণ্য: \" + $json.body.product.name + \"\\nবর্তমান স্টক: মাত্র \" + $json.body.product.stockCount + \"টি অবশিষ্ট!\\nমিনিমাম লিমিট: \" + $json.body.product.minThreshold + \"টি\\n\\n👉 দ্রুত স্টক রিস্টক করুন: http://localhost:3000/admin/inventory\"\n  }\n}"
+      },
+      "id": "whatsapp-low-stock",
+      "name": "WhatsApp Alert: Low Stock Warning",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 550]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/YOUR_PHONE_NUMBER_ID/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_META_WHATSAPP_ACCESS_TOKEN"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"01604121107\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"🚨 HUMAN SUPPORT REQUIRED!\\n\\nCustomer: \" + ($json.body.customerName || 'Customer') + \"\\nPhone: \" + ($json.body.customerPhone || 'N/A') + \"\\nChannel: \" + ($json.body.channel || 'Chat') + \"\\n\\nReason: \" + ($json.body.reason || 'Complex inquiry / Complaint') + \"\\n\\n👉 Open & Takeover Chat: http://localhost:3000/admin/inbox\"\n  }\n}"
+      },
+      "id": "whatsapp-human-handoff",
+      "name": "WhatsApp Alert: Human Handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 700]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-incoming",
+        "options": {}
+      },
+      "id": "webhook-whatsapp-incoming",
+      "name": "Incoming WhatsApp Webhook (Meta / Provider)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 900]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5000/api/v1/webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"channel\": \"WHATSAPP\",\n  \"channelId\": $json.body.entry[0].changes[0].value.messages[0].from,\n  \"content\": $json.body.entry[0].changes[0].value.messages[0].text ? $json.body.entry[0].changes[0].value.messages[0].text.body : \"\",\n  \"mediaUrl\": null,\n  \"mediaType\": \"TEXT\"\n}"
+      },
+      "id": "forward-to-backend-api",
+      "name": "Forward to Royal Honey Backend API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 900]
+    }
+  ],
+  "connections": {
+    "Royal Honey Events Webhook": {
+      "main": [
+        [
+          {
+            "node": "Classify Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Event": {
+      "main": [
+        [
+          {
+            "node": "Append to Google Sheets (Backup)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Alert: Payment Verification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Alert: Order Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Alert: Low Stock Warning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Alert: Human Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incoming WhatsApp Webhook (Meta / Provider)": {
+      "main": [
+        [
+          {
+            "node": "Forward to Royal Honey Backend API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+

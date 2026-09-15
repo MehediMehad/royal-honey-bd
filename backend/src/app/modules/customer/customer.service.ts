@@ -87,24 +87,20 @@ const formatMissingFieldsPrompt = (
   missingFields: Array<'name' | 'phone' | 'fullAddress' | 'district' | 'items'>,
 ): string => {
   if (missingFields.length === 0) {
-    return 'সব তথ্য সম্পূর্ণ পাওয়া গেছে! অনুগ্রহ করে নিচের অর্ডারের সারসংক্ষেপ দেখে নিশ্চিত (Confirm) করুন।';
+    return 'গ্রাহকের নাম, ফোন নম্বর, জেলা, ঠিকানা ও পণ্যের তথ্য সম্পূর্ণ পাওয়া গেছে। এখন মধুর নাম, ডেলিভারি চার্জসহ মোট বিল সুন্দরভাবে সাজিয়ে ক্যাশ অন ডেলিভারি বা বিকাশ/নগদ পেমেন্ট কনফার্মেশনের জন্য মিষ্টি করে বলুন।';
   }
 
   const fieldLabels: Record<string, string> = {
-    items: 'কোন মধু কতটুকু নেবেন',
-    name: 'আপনার নাম',
-    phone: '১১ ডিজিটের মোবাইল নম্বর',
-    district: 'আপনার জেলা',
-    fullAddress: 'পূর্ণ ডেলিভারি ঠিকানা (বাসা/রোড/এলাকা)',
+    items: 'কোন মধু কতটুকু লাগবে',
+    name: 'নাম',
+    phone: 'মোবাইল নম্বর',
+    district: 'জেলা',
+    fullAddress: 'ডেলিভারি ঠিকানা',
   };
 
   const missingLabels = missingFields.map((f) => fieldLabels[f]);
 
-  if (missingFields.length === 1) {
-    return `অর্ডারটি সম্পন্ন করতে অনুগ্রহ করে শুধুমাত্র **${missingLabels[0]}** প্রদান করুন।`;
-  }
-
-  return `অর্ডারটি সম্পন্ন করতে অনুগ্রহ করে নিচের তথ্যগুলো দিন:\n- ${missingLabels.join('\n- ')}`;
+  return `[সিস্টেম নোট]: অর্ডারের জন্য এখনো বাকি: ${missingLabels.join(', ')}। কাস্টমার যদি শুধু দাম বা বিস্তারিত জানতে চান, তবে পণ্যের গুণাগুণ ও দাম বলুন এবং তিনি নিতে চান কি না জিজ্ঞেস করুন। কাস্টমার অর্ডার করতে চাইলে বা নাম/ঠিকানা দিলে শুধুমাত্র বাকি তথ্যগুলো মানুষের মতো স্বাভাবিক ও মিষ্টি ভাষায় চেয়ে নিন।`;
 };
 
 export const CustomerServices = {

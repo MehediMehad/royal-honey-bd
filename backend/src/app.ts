@@ -12,6 +12,9 @@ import { apiLimiter } from './app/middlewares/rateLimiter';
 
 const app: Application = express();
 
+// Trust reverse proxies (ngrok, Nginx, Render, Cloudflare) for accurate client IP & rate limiting
+app.set('trust proxy', 1);
+
 // HTTP Logging
 if (config.app.env === 'development') {
   app.use(morgan('dev'));

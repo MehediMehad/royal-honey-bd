@@ -7,19 +7,78 @@ import {
 } from '../customer/customer.session';
 import type { ICartModificationResult } from './cart.interface';
 
+import config from '../../../configs';
+import { openai } from '../../libs/openai';
+
 /**
- * Match product by exact ID or fuzzy keywords
+ * AI-Powered Dynamic Product Resolver (Semantic Matching)
+ * Eliminates all static hardcoding. Dynamically matches customer typos, Banglish, and aliases to live DB products.
+ */
+const resolveProductWithAI = async (
+  query: string,
+  availableProducts: Array<{ id: string; name: string; weight: string; price: number }>,
+) => {
+  if (!config.openai.apiKey || availableProducts.length === 0) return null;
+
+  try {
+    const productCatalogStr = availableProducts
+      .map((p) => `- ID: "${p.id}", Name: "${p.name}", Weight: "${p.weight}", Price: ৳${p.price}`)
+      .join('\n');
+
+    const prompt = `You are an AI product matcher for Royal Honey BD.
+Customer search query / keyword: "${query}"
+
+Live store catalog:
+${productCatalogStr}
+
+Task:
+Determine which product ID from the catalog best matches the customer's query.
+Account for:
+- Bengali phonetic typos or autocorrect errors (e.g. "হানি নার্স" -> Honey Nut, "হানি বাদাম" -> Honey Nut, "৩টা মধু" -> স্পেশাল মিনি হানি কম্ব)
+- Banglish / English transliterations (e.g. "sorisha", "sundorbon", "ghee", "modhu")
+- Partial or colloquial names.
+
+Output ONLY a JSON object:
+{"matchedProductId": "01" | "02" | ... | null, "confidence": number}
+If the customer query is completely unrelated to any product in the store, return {"matchedProductId": null, "confidence": 0}.
+DO NOT output any explanations or markdown. Only valid JSON.`;
+
+    const response = await openai.chat.completions.create({
+      model: config.openai.chatModel,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices?.[0]?.message?.content?.trim();
+    if (!content) return null;
+
+    const parsed = JSON.parse(content);
+    if (parsed.matchedProductId && (parsed.confidence === undefined || parsed.confidence >= 0.5)) {
+      return await prisma.product.findUnique({
+        where: { id: String(parsed.matchedProductId) },
+      });
+    }
+  } catch (err) {
+    console.warn('⚠️ [CartService] AI Product Resolution error:', err);
+  }
+
+  return null;
+};
+
+/**
+ * Match product dynamically by exact ID, database query, or AI semantic matching
  */
 export const findProductByKeyword = async (keywordOrId: string) => {
   const clean = keywordOrId.toLowerCase().trim();
 
-  // Try direct ID match first
+  // 1. Direct ID match first
   let product = await prisma.product.findUnique({
     where: { id: clean },
   });
   if (product) return product;
 
-  // Search by name or description
+  // 2. Direct database search by name, id, or description
   product = await prisma.product.findFirst({
     where: {
       isAvailable: true,
@@ -30,32 +89,15 @@ export const findProductByKeyword = async (keywordOrId: string) => {
       ],
     },
   });
-
   if (product) return product;
 
-  // Bangla keyword mapping
-  if (clean.includes('সুন্দরবন') || clean.includes('sundarban')) {
-    const is1kg = clean.includes('1') || clean.includes('১') || clean.includes('কেজি') || clean.includes('kg');
-    return await prisma.product.findUnique({
-      where: { id: is1kg ? 'sundarban_1kg' : 'sundarban_500g' },
-    });
-  }
+  // 3. Dynamic AI Semantic Matcher (Zero hardcoded products - works for any newly added product or typo!)
+  const allAvailable = await prisma.product.findMany({
+    where: { isAvailable: true },
+    select: { id: true, name: true, weight: true, price: true },
+  });
 
-  if (clean.includes('সরিষা') || clean.includes('mustard')) {
-    const is1kg = clean.includes('1') || clean.includes('১') || clean.includes('কেজি') || clean.includes('kg');
-    return await prisma.product.findUnique({
-      where: { id: is1kg ? 'mustard_1kg' : 'mustard_500g' },
-    });
-  }
-
-  if (clean.includes('কালোজিরা') || clean.includes('black_seed')) {
-    const is1kg = clean.includes('1') || clean.includes('১') || clean.includes('কেজি') || clean.includes('kg');
-    return await prisma.product.findUnique({
-      where: { id: is1kg ? 'black_seed_1kg' : 'black_seed_500g' },
-    });
-  }
-
-  return null;
+  return await resolveProductWithAI(clean, allAvailable);
 };
 
 const getOrCreateActiveCart = async (customerId: string) => {

@@ -291,24 +291,25 @@ export const setupChatWorker = () => {
       if (extracted.cartActions && extracted.cartActions.length > 0) {
         for (const cartAction of extracted.cartActions) {
           const qty = cartAction.quantity || 1;
+          const productIdentifier = cartAction.productId || cartAction.productKeyword;
           if (cartAction.action === 'ADD') {
             await CartServices.addItemToCart(
               activeCustomerId,
-              cartAction.productKeyword,
+              productIdentifier,
               qty,
               session.district,
             );
           } else if (cartAction.action === 'UPDATE') {
             await CartServices.updateItemQuantity(
               activeCustomerId,
-              cartAction.productKeyword,
+              productIdentifier,
               qty,
               session.district,
             );
           } else if (cartAction.action === 'REMOVE') {
             await CartServices.removeItemFromCart(
               activeCustomerId,
-              cartAction.productKeyword,
+              productIdentifier,
               session.district,
             );
           } else if (cartAction.action === 'CLEAR') {

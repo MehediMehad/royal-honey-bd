@@ -1,5 +1,6 @@
 import config from '../../../configs';
 import { openai } from '../../libs/openai';
+import prisma from '../../libs/prisma';
 
 export interface IExtractedEntities {
   customerInfo?: {
@@ -11,6 +12,7 @@ export interface IExtractedEntities {
   };
   cartActions?: Array<{
     action: 'ADD' | 'UPDATE' | 'REMOVE' | 'CLEAR';
+    productId?: string | null;
     productKeyword: string;
     quantity: number;
   }>;
@@ -66,10 +68,15 @@ const extractionTools: any[] = [
                   description:
                     'ADD when requesting to buy/take, UPDATE when changing quantity (e.g. ২টার বদলে ৩টা), REMOVE when canceling an item, CLEAR when clearing cart',
                 },
+                productId: {
+                  type: 'string',
+                  description:
+                    'The matched Product ID from the active catalog if recognized, or null if uncertain',
+                },
                 productKeyword: {
                   type: 'string',
                   description:
-                    'Product name or weight (e.g. সুন্দরবন ১ কেজি, সরিষা ৫০০ গ্রাম, কালোজিরা মধু)',
+                    'Product name or weight as mentioned by customer (e.g. সুন্দরবন ১ কেজি, সরিষা ৫০০ গ্রাম, হানি নাট, হানি নার্স)',
                 },
                 quantity: {
                   type: 'number',
@@ -117,13 +124,29 @@ export const extractCustomerAndCartEntities = async (
   }
 
   try {
+    // Dynamically fetch live store catalog so entity extractor recognizes all active products and IDs
+    const activeProducts = await prisma.product.findMany({
+      where: { isAvailable: true },
+      select: { id: true, name: true, weight: true, price: true },
+    });
+    const catalogList = activeProducts
+      .map((p) => `- ID: "${p.id}", Name: "${p.name}" (${p.weight}, ৳${p.price})`)
+      .join('\n');
+
     const response = await openai.chat.completions.create({
       model: config.openai.chatModel,
       messages: [
         {
           role: 'system',
-          content:
-            'You are an expert entity extraction system for a Bangladeshi honey business named Royal Honey BD. Analyze the customer message (Bangla, English, or Banglish) and extract personal details (name, phone, address, thana, district) and any product order/cart actions.',
+          content: `You are an expert entity extraction system for a Bangladeshi honey business named Royal Honey BD.
+Analyze the customer message (Bangla, English, or Banglish) and extract personal details (name, phone, address, thana, district) and any product order/cart actions.
+
+Live available product catalog:
+${catalogList}
+
+When extracting cartActions:
+- If customer mentions any product (including typos like "হানি নার্স" for Honey Nut, or Banglish like "sorisha modhu", or "৩টা কম্বো"), match it to the exact matched Product ID from the catalog and set productId.
+- If unsure of exact product ID, leave productId as null and set productKeyword.`,
         },
         {
           role: 'user',

@@ -48,10 +48,18 @@ const updateOrderStatusZodSchema = z.object({
 });
 
 const verifyPaymentZodSchema = z.object({
-  body: z.object({
-    status: z.enum(['PAID', 'REJECTED']),
-    adminNotes: z.string().optional(),
-  }),
+  body: z
+    .object({
+      status: z.enum(['PAID', 'REJECTED', 'APPROVE', 'REJECT']).optional(),
+      action: z.enum(['APPROVE', 'REJECT', 'PAID', 'REJECTED']).optional(),
+      adminNotes: z.string().optional(),
+      notes: z.string().optional(),
+      note: z.string().optional(),
+      transactionId: z.string().optional(),
+    })
+    .refine((data) => !!(data.status || data.action), {
+      message: 'status অথবা action প্রদান করুন (PAID/REJECTED বা APPROVE/REJECT)',
+    }),
 });
 
 export const OrderValidations = {

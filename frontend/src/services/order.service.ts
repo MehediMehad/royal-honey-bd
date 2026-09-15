@@ -31,6 +31,7 @@ export const orderService = {
   ): Promise<ApiResponse<Order>> {
     return apiClient.patch<Order>(API_ENDPOINTS.ORDERS.VERIFY_PAYMENT(id), {
       action,
+      status: action === "APPROVE" ? "PAID" : "REJECTED",
       notes,
     });
   },

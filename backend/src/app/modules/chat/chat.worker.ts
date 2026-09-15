@@ -473,6 +473,34 @@ export const setupChatWorker = () => {
             aiReply = `দুঃখিত! ${err?.message || 'অর্ডার সম্পন্ন করা সম্ভব হয়নি।'} অনুগ্রহ করে আমাদের হেল্পলাইনে (01604121107) যোগাযোগ করুন।`;
           }
         }
+
+        // Case 8.1b: Customer explicitly requests bKash or Nagad payment instructions with active cart
+        if (
+          !aiReply &&
+          session.cart.items.length > 0 &&
+          !extracted.transactionId &&
+          !visionResult?.isPaymentScreenshot &&
+          (extracted.paymentMethod === 'BKASH' ||
+            extracted.paymentMethod === 'NAGAD' ||
+            /বিকাশ|নগদ|bkash|bikash|nagad/i.test(processedText)) &&
+          /(পেমেন্ট|payment|টাকা|পাঠাব|দিতে|দিব|পাঠাতে|পাঠাই|করব|করতে|korte|kivabe|number|নম্বর|chai|চাই|ken|কেন)/i.test(
+            processedText,
+          )
+        ) {
+          const customerGreeting = session.name ? `${session.name} স্যার` : 'স্যার';
+          const methodLabel =
+            extracted.paymentMethod === 'NAGAD' || /নগদ|nagad/i.test(processedText) ? 'নগদ' : 'বিকাশ';
+          const totalAmount = session.cart.finalTotal > 0 ? `৳${session.cart.finalTotal}` : 'অর্ডারের মোট টাকা';
+
+          let extraFollowUp = '';
+          if (session.missingFields.includes('fullAddress') || !session.fullAddress) {
+            extraFollowUp =
+              '\n\nপাশাপাশি পার্সেলটি পাঠিয়ে দেওয়ার জন্য আপনার সম্পূর্ণ ডেলিভারি ঠিকানাটি (বাসা/রোড/এলাকা) একটু লিখে জানান স্যার। 😊';
+          }
+
+          aiReply = `জি অবশ্যই ${customerGreeting}! আমাদের ${methodLabel} ও নগদ উভয় মাধ্যমেই পেমেন্ট নেওয়ার সুব্যবস্থা রয়েছে। ❤️\n\n📱 বিকাশ / নগদ (Personal): 01604121107\n💰 মোট প্রদেয়: ${totalAmount}\n\nঅনুগ্রহ করে এই নম্বরে Send Money করে TrxID লিখে পাঠান অথবা সফল পেমেন্টের একটি স্ক্রিনশট দিন। আমরা পেমেন্ট নিশ্চিত করে দ্রুত পার্সেল রেডি করে দিচ্ছি স্যার। 😊${extraFollowUp}`;
+        }
+
         // Check if order summary was actually presented to the customer in recent messages
         const summaryWasShown = recentHistory.some(
           (m) =>

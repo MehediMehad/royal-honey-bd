@@ -264,18 +264,39 @@ const searchKnowledge = async (searchParams: ISearchKnowledgeQuery) => {
 
   // 2. Keyword fallback if embedding not available or yields low results
   const lowerQuery = query.toLowerCase();
-  const keywords = lowerQuery.split(/\s+/).filter((w) => w.length > 2);
+  const rawKeywords = lowerQuery.split(/\s+/).filter((w) => w.length > 2);
+  const synonyms: Record<string, string[]> = {
+    bikash: ['বিকাশ', 'bkash'],
+    bkash: ['বিকাশ', 'bikash'],
+    nagad: ['নগদ'],
+    nogod: ['নগদ', 'nagad'],
+    payment: ['পেমেন্ট', 'টাকা'],
+    pay: ['পেমেন্ট', 'টাকা'],
+    delivery: ['ডেলিভারি', 'চার্জ'],
+    modhu: ['মধু'],
+    honey: ['মধু'],
+    khati: ['খাঁটি', 'প্রাকৃতিক'],
+    dam: ['দাম', 'টাকা', 'মূল্য'],
+    price: ['দাম', 'মূল্য'],
+    dhaka: ['ঢাকা'],
+  };
+  const expandedKeywords = new Set<string>(rawKeywords);
+  for (const kw of rawKeywords) {
+    if (synonyms[kw]) {
+      synonyms[kw].forEach((s) => expandedKeywords.add(s));
+    }
+  }
 
   const scoredFallback = allItems
     .map((item) => {
       const fullText = `${item.question} ${item.answer} ${item.tags.join(' ')}`.toLowerCase();
       let matchCount = 0;
-      for (const kw of keywords) {
+      for (const kw of expandedKeywords) {
         if (fullText.includes(kw)) {
           matchCount++;
         }
       }
-      const score = keywords.length > 0 ? matchCount / keywords.length : 0;
+      const score = expandedKeywords.size > 0 ? matchCount / expandedKeywords.size : 0;
       return {
         item: {
           id: item.id,

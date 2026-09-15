@@ -18,8 +18,12 @@ export interface ICreateOrderPayload {
 }
 
 export interface IVerifyPaymentPayload {
+  status?: 'PAID' | 'REJECTED' | 'APPROVE' | 'REJECT';
+  action?: 'APPROVE' | 'REJECT' | 'PAID' | 'REJECTED';
   transactionId?: string;
   note?: string;
+  notes?: string;
+  adminNotes?: string;
 }
 
 export interface IOrderFilterQuery {

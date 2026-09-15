@@ -259,44 +259,96 @@ const verifyAdvancePayment = async (
     throw new ApiError(httpStatus.NOT_FOUND, `অর্ডার "${orderId}" পাওয়া যায়নি।`);
   }
 
-  if (existing.paymentStatus === PaymentStatus.PAID) {
-    throw new ApiError(
-      httpStatus.BAD_REQUEST,
-      'এই অর্ডারের পেমেন্ট ইতোমধ্যে ভেরিফাই ও পরিশোধিত হয়েছে।',
+  const rawAction = (payload?.action || payload?.status || 'APPROVE').toUpperCase();
+  const isApproved = rawAction === 'APPROVE' || rawAction === 'PAID';
+  const notesText = payload?.notes || payload?.note || payload?.adminNotes;
+
+  if (isApproved) {
+    if (existing.paymentStatus === PaymentStatus.PAID) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        'এই অর্ডারের পেমেন্ট ইতোমধ্যে ভেরিফাই ও পরিশোধিত হয়েছে।',
+      );
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        orderStatus: OrderStatus.CONFIRMED,
+        paymentStatus: PaymentStatus.PAID,
+        paymentVerifiedAt: new Date(),
+        paymentVerifiedBy: adminUserId || 'ADMIN',
+        transactionId: payload?.transactionId || existing.transactionId,
+        notes: notesText
+          ? existing.notes
+            ? `${existing.notes} | ${notesText}`
+            : notesText
+          : existing.notes,
+      },
+      include: {
+        customer: true,
+        items: true,
+      },
+    });
+
+    try {
+      const { emitSocketEvent } = await import('../../libs/socket');
+      emitSocketEvent('order:status_updated', {
+        orderId: updatedOrder.id,
+        status: updatedOrder.orderStatus,
+        paymentStatus: updatedOrder.paymentStatus,
+      });
+    } catch (socketErr) {
+      console.warn('⚠️ [Socket.io] Failed to emit order:status_updated:', socketErr);
+    }
+
+    // Trigger confirmed alert
+    OrderAlerts.sendOrderConfirmedAlert(updatedOrder, updatedOrder.customer).catch((err) =>
+      console.error('Error in sendOrderConfirmedAlert:', err),
     );
-  }
 
-  const updatedOrder = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      orderStatus: OrderStatus.CONFIRMED,
-      paymentStatus: PaymentStatus.PAID,
-      paymentVerifiedAt: new Date(),
-      paymentVerifiedBy: adminUserId || 'ADMIN',
-      transactionId: payload?.transactionId || existing.transactionId,
-      notes: payload?.note
-        ? existing.notes
-          ? `${existing.notes} | ${payload.note}`
-          : payload.note
-        : existing.notes,
-    },
-    include: {
-      customer: true,
-      items: true,
-    },
-  });
+    // Auto-book courier parcel
+    try {
+      const { CourierServices } = await import('../courier/courier.service');
+      return await CourierServices.bookOrderParcel(orderId);
+    } catch (err) {
+      console.warn('⚠️ Auto courier booking failed on payment verification:', err);
+      return updatedOrder;
+    }
+  } else {
+    // Rejected advance payment
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        orderStatus: OrderStatus.CANCELLED,
+        paymentStatus: PaymentStatus.FAILED,
+        paymentVerifiedAt: new Date(),
+        paymentVerifiedBy: adminUserId || 'ADMIN',
+        notes: notesText
+          ? existing.notes
+            ? `${existing.notes} | Payment Rejected: ${notesText}`
+            : `Payment Rejected: ${notesText}`
+          : existing.notes
+            ? `${existing.notes} | Payment Rejected`
+            : 'Payment Rejected by Admin',
+      },
+      include: {
+        customer: true,
+        items: true,
+      },
+    });
 
-  // Trigger confirmed alert
-  OrderAlerts.sendOrderConfirmedAlert(updatedOrder, updatedOrder.customer).catch((err) =>
-    console.error('Error in sendOrderConfirmedAlert:', err),
-  );
+    try {
+      const { emitSocketEvent } = await import('../../libs/socket');
+      emitSocketEvent('order:status_updated', {
+        orderId: updatedOrder.id,
+        status: updatedOrder.orderStatus,
+        paymentStatus: updatedOrder.paymentStatus,
+      });
+    } catch (socketErr) {
+      console.warn('⚠️ [Socket.io] Failed to emit order:status_updated:', socketErr);
+    }
 
-  // Auto-book courier parcel
-  try {
-    const { CourierServices } = await import('../courier/courier.service');
-    return await CourierServices.bookOrderParcel(orderId);
-  } catch (err) {
-    console.warn('⚠️ Auto courier booking failed on payment verification:', err);
     return updatedOrder;
   }
 };

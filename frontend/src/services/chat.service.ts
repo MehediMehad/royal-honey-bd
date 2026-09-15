@@ -29,7 +29,7 @@ export const chatService = {
   ): Promise<ApiResponse<{ message: string; data: Message }>> {
     return apiClient.post<{ message: string; data: Message }>(
       API_ENDPOINTS.CHAT.REPLY(conversationId),
-      { text }
+      { content: text, text }
     );
   },
 };

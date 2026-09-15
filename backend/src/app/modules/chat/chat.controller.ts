@@ -3,6 +3,7 @@ import httpStatus from 'http-status';
 import catchAsync from '../../helpers/catchAsync';
 import pick from '../../helpers/pick';
 import sendResponse from '../../utils/sendResponse';
+import ApiError from '../../errors/ApiError';
 import { ChatServices } from './chat.service';
 
 const getAllConversations = catchAsync(async (req: Request, res: Response) => {
@@ -59,12 +60,16 @@ const resumeAi = catchAsync(async (req: Request, res: Response) => {
 
 const sendAgentReply = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
-  const { content } = req.body;
+  const content = req.body?.content || req.body?.text || req.body?.message;
   const adminUser = (req as any).user;
+
+  if (!content || typeof content !== 'string' || !content.trim()) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Message content is required');
+  }
 
   const result = await ChatServices.sendAgentReply(
     id,
-    content,
+    content.trim(),
     adminUser?.id || adminUser?.userId,
   );
 

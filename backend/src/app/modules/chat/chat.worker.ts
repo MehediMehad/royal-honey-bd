@@ -265,8 +265,14 @@ export const setupChatWorker = () => {
         activeCustomerId = session.customerId;
       }
 
+      // Fetch recent messages for extraction context
+      const recentHistory = await ChatServices.getCrossChannelMessageHistory(activeCustomerId, 4);
+
       // 5. Extract Customer Details, Cart Actions, Payment Method & Confirmation Intent via OpenAI
-      const extracted = await extractCustomerAndCartEntities(processedText);
+      const extracted = await extractCustomerAndCartEntities(processedText, {
+        currentCart: session.cart.items,
+        recentMessages: recentHistory.map((m) => ({ sender: m.sender, content: m.content })),
+      });
 
       // If vision detected payment proof, merge payment fields
       if (visionResult?.imageCategory === 'PAYMENT_PROOF' && visionResult.paymentData) {
@@ -291,7 +297,11 @@ export const setupChatWorker = () => {
       if (extracted.cartActions && extracted.cartActions.length > 0) {
         for (const cartAction of extracted.cartActions) {
           const qty = cartAction.quantity || 1;
-          const productIdentifier = cartAction.productId || cartAction.productKeyword;
+          let productIdentifier = cartAction.productId || cartAction.productKeyword;
+          // Fallback: If identifier not explicitly returned but customer has 1 product in cart, update that product
+          if (!productIdentifier && session.cart.items.length === 1) {
+            productIdentifier = session.cart.items[0].productId;
+          }
           if (cartAction.action === 'ADD') {
             await CartServices.addItemToCart(
               activeCustomerId,

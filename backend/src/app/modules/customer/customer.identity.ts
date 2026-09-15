@@ -116,26 +116,18 @@ export const mergeCustomerIdentities = async (
           data: { customerId: targetCustomerId },
         });
       } else {
-        // Consolidate cart items
+        // Source cart contains items currently being actively negotiated/ordered in the chat session.
+        // Clear stale abandoned items from targetCart so ancient test/abandoned items do not pollute the new order.
+        await tx.cartItem.deleteMany({ where: { cartId: targetCart.id } });
         for (const sItem of sourceCart.items) {
-          const matchingTargetItem = targetCart.items.find(
-            (ti) => ti.productId === sItem.productId,
-          );
-          if (matchingTargetItem) {
-            await tx.cartItem.update({
-              where: { id: matchingTargetItem.id },
-              data: { quantity: matchingTargetItem.quantity + sItem.quantity },
-            });
-          } else {
-            await tx.cartItem.create({
-              data: {
-                cartId: targetCart.id,
-                productId: sItem.productId,
-                quantity: sItem.quantity,
-                unitPrice: sItem.unitPrice,
-              },
-            });
-          }
+          await tx.cartItem.create({
+            data: {
+              cartId: targetCart.id,
+              productId: sItem.productId,
+              quantity: sItem.quantity,
+              unitPrice: sItem.unitPrice,
+            },
+          });
         }
         // Delete source cart items & cart
         await tx.cartItem.deleteMany({ where: { cartId: sourceCart.id } });

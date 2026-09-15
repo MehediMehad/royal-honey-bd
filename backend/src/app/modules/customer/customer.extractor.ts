@@ -113,14 +113,25 @@ const extractionTools: any[] = [
   },
 ];
 
+export interface IExtractionContext {
+  currentCart?: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice?: number;
+  }>;
+  recentMessages?: Array<{ sender: string; content: string }>;
+}
+
 /**
  * Extract entities and cart intentions using OpenAI Function Calling
  */
 export const extractCustomerAndCartEntities = async (
   customerMessage: string,
+  context?: IExtractionContext,
 ): Promise<IExtractedEntities> => {
   if (!config.openai.apiKey) {
-    return heuristicFallbackExtraction(customerMessage);
+    return heuristicFallbackExtraction(customerMessage, context);
   }
 
   try {
@@ -133,6 +144,22 @@ export const extractCustomerAndCartEntities = async (
       .map((p) => `- ID: "${p.id}", Name: "${p.name}" (${p.weight}, ৳${p.price})`)
       .join('\n');
 
+    let contextSection = '';
+    if (context?.currentCart && context.currentCart.length > 0) {
+      const cartItemsStr = context.currentCart
+        .map((ci) => `- Product ID: "${ci.productId}", Name: "${ci.productName}", Current Quantity: ${ci.quantity}`)
+        .join('\n');
+      contextSection += `\nCustomer's Current Cart Items:\n${cartItemsStr}\n`;
+    }
+
+    if (context?.recentMessages && context.recentMessages.length > 0) {
+      const historyStr = context.recentMessages
+        .slice(-4)
+        .map((m) => `${m.sender}: "${m.content}"`)
+        .join('\n');
+      contextSection += `\nRecent Conversation History:\n${historyStr}\n`;
+    }
+
     const response = await openai.chat.completions.create({
       model: config.openai.chatModel,
       messages: [
@@ -143,9 +170,11 @@ Analyze the customer message (Bangla, English, or Banglish) and extract personal
 
 Live available product catalog:
 ${catalogList}
-
+${contextSection}
 When extracting cartActions:
 - If customer mentions any product (including typos like "হানি নার্স" for Honey Nut, or Banglish like "sorisha modhu", or "৩টা কম্বো"), match it to the exact matched Product ID from the catalog and set productId.
+- If customer changes quantity or clarifies total count wanted (e.g. "ami dui 2 ta nite chai", "২টা লাগবে", "২টা দেন", "২টি নিব", "১টা বাদ দেন"):
+  Look at the product in the customer's current cart or the product discussed in the recent conversation. Set action to 'UPDATE' with that productId and the requested total quantity (e.g. 2). DO NOT use 'ADD' if the customer is clarifying or changing the count for an already selected item.
 - If unsure of exact product ID, leave productId as null and set productKeyword.`,
         },
         {
@@ -166,13 +195,16 @@ When extracting cartActions:
     console.warn('⚠️ OpenAI Entity Extraction fallback triggered:', error?.message || error);
   }
 
-  return heuristicFallbackExtraction(customerMessage);
+  return heuristicFallbackExtraction(customerMessage, context);
 };
 
 /**
  * Fast regex-based fallback if OpenAI is offline
  */
-const heuristicFallbackExtraction = (text: string): IExtractedEntities => {
+const heuristicFallbackExtraction = (
+  text: string,
+  context?: IExtractionContext,
+): IExtractedEntities => {
   const result: IExtractedEntities = {
     customerInfo: {},
     cartActions: [],
@@ -213,6 +245,47 @@ const heuristicFallbackExtraction = (text: string): IExtractedEntities => {
       productKeyword: keyword,
       quantity: 1,
     });
+  } else if (context?.currentCart && context.currentCart.length === 1) {
+    // Dynamic numeric extraction (supports both English and Bengali numerals: ১, ২, ৩, ১০, etc.)
+    const banglaToEng: Record<string, string> = {
+      '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+      '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+    };
+    const wordNums: Record<string, number> = {
+      dui: 2, duto: 2, দুই: 2, দুটি: 2,
+      tin: 3, tinta: 3, তিন: 3, তিনটি: 3,
+      char: 4, চার: 4, চারটি: 4,
+      paach: 5, পাঁচ: 5, পাঁচটি: 5,
+    };
+
+    const numMatch = text.match(/(\d+|[০-৯]+)\s*(?:ta|টা|ti|টি|jar|জার|pcs|পিস)?/i);
+    let detectedQty: number | null = null;
+
+    if (numMatch) {
+      const normalized = numMatch[1].replace(/[০-৯]/g, (d) => banglaToEng[d] || d);
+      const parsed = parseInt(normalized, 10);
+      if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
+        detectedQty = parsed;
+      }
+    }
+
+    if (!detectedQty) {
+      for (const [word, val] of Object.entries(wordNums)) {
+        if (new RegExp(`\\b${word}\\b`, 'i').test(text) || text.includes(word)) {
+          detectedQty = val;
+          break;
+        }
+      }
+    }
+
+    if (detectedQty) {
+      result.cartActions?.push({
+        action: 'UPDATE',
+        productId: context.currentCart[0].productId,
+        productKeyword: context.currentCart[0].productName,
+        quantity: detectedQty,
+      });
+    }
   }
 
   // 4. Payment method detection

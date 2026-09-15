@@ -63,10 +63,12 @@ export default function AdminInboxPage() {
     try {
       const res = await chatService.getMessages(convId);
       if (res.success && res.data) {
-        const msgList = Array.isArray(res.data)
+        const msgList: Message[] = Array.isArray(res.data)
           ? res.data
           : (res.data as { messages?: Message[] }).messages || [];
-        setMessages(msgList);
+        // Deduplicate messages by ID
+        const unique = Array.from(new Map(msgList.map((m) => [m.id, m])).values());
+        setMessages(unique);
       } else {
         setMessages([]);
       }
@@ -91,7 +93,14 @@ export default function AdminInboxPage() {
 
       const handleNewMessage = (msg: Message) => {
         if (msg.conversationId === activeConvId) {
-          setMessages((prev) => [...(Array.isArray(prev) ? prev : []), msg]);
+          setMessages((prev) => {
+            const list = Array.isArray(prev) ? prev : [];
+            // Prevent duplicate message if already in state
+            if (msg.id && list.some((m) => m.id === msg.id)) {
+              return list;
+            }
+            return [...list, msg];
+          });
         }
         // Update last message in conversation list
         setConversations((prev) =>
@@ -178,7 +187,14 @@ export default function AdminInboxPage() {
     try {
       const res = await chatService.sendReply(activeConvId, text);
       if (res.success && res.data?.data) {
-        setMessages((prev) => [...(Array.isArray(prev) ? prev : []), res.data.data]);
+        const newMsg = res.data.data;
+        setMessages((prev) => {
+          const list = Array.isArray(prev) ? prev : [];
+          if (newMsg.id && list.some((m) => m.id === newMsg.id)) {
+            return list;
+          }
+          return [...list, newMsg];
+        });
         // Also update local status to HUMAN_TAKEOVER
         setConversations((prev) =>
           prev.map((c) =>

@@ -74,13 +74,19 @@ export const getSocketIo = (): SocketIoServer | null => {
 };
 
 /**
- * Emit event to admin room or specific conversation room
+ * Emit event to admin room or specific conversation room(s).
+ * When multiple rooms are specified, Socket.IO automatically deduplicates recipients.
  */
-export const emitSocketEvent = (event: string, data: any, room?: string) => {
+export const emitSocketEvent = (event: string, data: any, room?: string | string[]) => {
   if (!io) return;
 
   if (room) {
-    io.to(room).emit(event, data);
+    const rooms = Array.isArray(room) ? room : [room];
+    let broadcaster: any = io;
+    for (const r of rooms) {
+      broadcaster = broadcaster.to(r);
+    }
+    broadcaster.emit(event, data);
   } else {
     // Default to admin room
     io.to('admin').emit(event, data);

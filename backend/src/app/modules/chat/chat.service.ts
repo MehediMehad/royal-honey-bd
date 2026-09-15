@@ -64,8 +64,7 @@ const saveCustomerMessage = async (
       text: message.content,
       sender: message.sender,
     };
-    emitSocketEvent('message:new', payload, `conversation:${conversationId}`);
-    emitSocketEvent('message:new', payload);
+    emitSocketEvent('message:new', payload, [`conversation:${conversationId}`, 'admin']);
   } catch (socketErr) {
     console.warn('⚠️ [Socket.io] Failed to emit customer message:', socketErr);
   }
@@ -145,8 +144,7 @@ const saveAiMessage = async (conversationId: string, content: string) => {
       text: message.content,
       sender: message.sender,
     };
-    emitSocketEvent('message:new', payload, `conversation:${conversationId}`);
-    emitSocketEvent('message:new', payload);
+    emitSocketEvent('message:new', payload, [`conversation:${conversationId}`, 'admin']);
   } catch (socketErr) {
     console.warn('⚠️ [Socket.io] Failed to emit AI message:', socketErr);
   }
@@ -434,8 +432,7 @@ const sendAgentReply = async (
     text: message.content,
     sender: message.sender,
   };
-  emitSocketEvent('message:new', payload, `conversation:${conversationId}`);
-  emitSocketEvent('message:new', payload);
+  emitSocketEvent('message:new', payload, [`conversation:${conversationId}`, 'admin']);
   emitSocketEvent('new_message', { conversationId, message });
 
   return message;

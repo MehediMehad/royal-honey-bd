@@ -17,7 +17,6 @@ const SILENCE_PATTERNS = [
   'you for watching',
   '...',
   'প্রতিবেদন:',
-  'ধন্যবাদ',
 ];
 
 /**
@@ -27,28 +26,48 @@ const downloadAudioBuffer = async (
   audioUrl: string,
   channel?: 'FACEBOOK' | 'WHATSAPP',
 ): Promise<{ buffer: Buffer; mimeType: string }> => {
-  const headers: Record<string, string> = {};
+  let downloadUrl = audioUrl;
+  let targetMimeType = 'audio/ogg';
+  const token =
+    channel === 'WHATSAPP'
+      ? config.meta.whatsappToken
+      : config.meta.pageAccessToken;
 
-  // Attach Meta/WhatsApp Graph API token if fetching directly from Graph API media endpoints
-  if (audioUrl.includes('graph.facebook.com') || audioUrl.includes('lookaside.fbsbx.com')) {
-    const token =
-      channel === 'WHATSAPP'
-        ? config.meta.whatsappToken
-        : config.meta.pageAccessToken;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+  // Step 1: If WhatsApp media endpoint (graph.facebook.com), retrieve the actual CDN URL first
+  if (downloadUrl.includes('graph.facebook.com')) {
+    console.log(`📥 [VoiceService] Resolving Meta Graph API media URL: ${downloadUrl}`);
+    const metaResponse = await axios.get(downloadUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      timeout: 15000,
+    });
+
+    if (metaResponse.data?.url) {
+      downloadUrl = metaResponse.data.url;
+      if (metaResponse.data.mime_type) {
+        targetMimeType = metaResponse.data.mime_type;
+      }
+      console.log(`📥 [VoiceService] Resolved actual media download URL: ${downloadUrl.substring(0, 80)}...`);
     }
   }
 
-  const response = await axios.get(audioUrl, {
+  // Step 2: Download binary audio stream from CDN
+  const headers: Record<string, string> = {
+    'User-Agent': 'RoyalHoneyBD-Worker/1.0',
+  };
+  if (token && (downloadUrl.includes('facebook.com') || downloadUrl.includes('fbsbx.com'))) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await axios.get(downloadUrl, {
     responseType: 'arraybuffer',
     headers,
-    timeout: 20000,
+    timeout: 30000,
   });
 
-  const contentType = String(response.headers['content-type'] || 'audio/ogg');
+  const contentType = String(response.headers['content-type'] || targetMimeType);
   const buffer = Buffer.from(response.data);
 
+  console.log(`✅ [VoiceService] Downloaded audio buffer: ${buffer.length} bytes, type: ${contentType}`);
   return { buffer, mimeType: contentType };
 };
 
@@ -95,27 +114,30 @@ const transcribeBanglaAudio = async (
 
   // Determine file extension for OpenAI Whisper
   let extension = 'ogg';
-  if (mimeType.includes('mp4') || mimeType.includes('m4a')) extension = 'm4a';
-  else if (mimeType.includes('mp3') || mimeType.includes('mpeg')) extension = 'mp3';
-  else if (mimeType.includes('wav')) extension = 'wav';
-  else if (mimeType.includes('webm')) extension = 'webm';
-  else if (mimeType.includes('aac')) extension = 'aac';
+  const cleanMime = mimeType.split(';')[0].trim().toLowerCase();
+  if (cleanMime.includes('mp4') || cleanMime.includes('m4a')) extension = 'm4a';
+  else if (cleanMime.includes('mp3') || cleanMime.includes('mpeg')) extension = 'mp3';
+  else if (cleanMime.includes('wav')) extension = 'wav';
+  else if (cleanMime.includes('webm')) extension = 'webm';
+  else if (cleanMime.includes('aac')) extension = 'aac';
+  else if (cleanMime.includes('ogg') || cleanMime.includes('opus')) extension = 'ogg';
 
   try {
     const file = await toFile(audioBuffer, `voice_input.${extension}`, {
-      type: mimeType,
+      type: cleanMime,
     });
 
     const transcription = await openai.audio.transcriptions.create({
       file,
       model: 'whisper-1',
-      language: 'bn', // Bengali
       prompt: BANGLA_WHISPER_PROMPT,
       temperature: 0.2, // Low temperature for high factual precision
     });
 
     const transcribedText = (transcription.text || '').trim();
     const ambiguous = isTranscriptionAmbiguous(transcribedText);
+
+    console.log(`🎙️ [VoiceService] Transcribed text: "${transcribedText}" (ambiguous: ${ambiguous})`);
 
     return {
       text: transcribedText,

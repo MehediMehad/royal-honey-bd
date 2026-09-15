@@ -15,26 +15,42 @@ const downloadVideoBuffer = async (
   videoUrl: string,
   channel?: 'FACEBOOK' | 'WHATSAPP',
 ): Promise<{ buffer: Buffer; mimeType: string }> => {
-  const headers: Record<string, string> = {};
+  let downloadUrl = videoUrl;
+  let targetMimeType = 'video/mp4';
+  const token =
+    channel === 'WHATSAPP'
+      ? config.meta.whatsappToken
+      : config.meta.pageAccessToken;
 
-  if (videoUrl.includes('graph.facebook.com') || videoUrl.includes('lookaside.fbsbx.com')) {
-    const token =
-      channel === 'WHATSAPP'
-        ? config.meta.whatsappToken
-        : config.meta.pageAccessToken;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+  // Step 1: If WhatsApp media endpoint (graph.facebook.com), resolve actual CDN URL first
+  if (downloadUrl.includes('graph.facebook.com')) {
+    const metaRes = await axios.get(downloadUrl, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      timeout: 15000,
+    });
+    if (metaRes.data?.url) {
+      downloadUrl = metaRes.data.url;
+      if (metaRes.data.mime_type) {
+        targetMimeType = metaRes.data.mime_type;
+      }
     }
   }
 
-  const response = await axios.get(videoUrl, {
+  const headers: Record<string, string> = {
+    'User-Agent': 'RoyalHoneyBD-Worker/1.0',
+  };
+  if (token && (downloadUrl.includes('facebook.com') || downloadUrl.includes('fbsbx.com'))) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await axios.get(downloadUrl, {
     responseType: 'arraybuffer',
     headers,
-    timeout: 30000,
+    timeout: 35000,
     maxContentLength: 25 * 1024 * 1024, // 25 MB limit for API safety
   });
 
-  const contentType = String(response.headers['content-type'] || 'video/mp4');
+  const contentType = String(response.headers['content-type'] || targetMimeType);
   const buffer = Buffer.from(response.data);
 
   return { buffer, mimeType: contentType };
@@ -64,7 +80,6 @@ const transcribeVideoAudio = async (
     const transcription = await openai.audio.transcriptions.create({
       file,
       model: 'whisper-1',
-      language: 'bn',
       prompt: BANGLA_VIDEO_WHISPER_PROMPT,
       temperature: 0.2,
     });

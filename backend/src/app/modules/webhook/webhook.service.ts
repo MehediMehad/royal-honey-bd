@@ -128,11 +128,11 @@ const extractMessagesFromPayload = (
 
                 if (waMsg.type === 'audio' || waMsg.type === 'voice') {
                   mediaType = 'AUDIO';
+                  const audioObj = waMsg.audio || waMsg.voice;
                   mediaUrl =
-                    waMsg.audio?.link ||
-                    waMsg.voice?.link ||
-                    (waMsg.audio?.id
-                      ? `https://graph.facebook.com/v21.0/${waMsg.audio.id}`
+                    audioObj?.link ||
+                    (audioObj?.id
+                      ? `https://graph.facebook.com/v21.0/${audioObj.id}`
                       : undefined);
                 } else if (waMsg.type === 'image') {
                   mediaType = 'IMAGE';

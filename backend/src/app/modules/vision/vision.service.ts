@@ -73,12 +73,38 @@ const fetchImageAsDataUri = async (imageUrl: string): Promise<string> => {
   }
 
   try {
-    const response = await axiosHttp.get(imageUrl, {
+    let downloadUrl = imageUrl;
+    let targetMimeType = 'image/jpeg';
+    const token = config.meta.whatsappToken || config.meta.pageAccessToken;
+
+    // Step 1: If WhatsApp media endpoint (graph.facebook.com), resolve actual CDN URL first
+    if (downloadUrl.includes('graph.facebook.com')) {
+      const metaRes = await axiosHttp.get(downloadUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        timeout: 15000,
+      });
+      if (metaRes.data?.url) {
+        downloadUrl = metaRes.data.url;
+        if (metaRes.data.mime_type) {
+          targetMimeType = metaRes.data.mime_type;
+        }
+      }
+    }
+
+    const headers: Record<string, string> = {
+      'User-Agent': 'RoyalHoneyBD-Worker/1.0',
+    };
+    if (token && (downloadUrl.includes('facebook.com') || downloadUrl.includes('fbsbx.com'))) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await axiosHttp.get(downloadUrl, {
       responseType: 'arraybuffer',
-      timeout: 15000,
+      headers,
+      timeout: 20000,
     });
 
-    const contentType = String(response.headers['content-type'] || 'image/jpeg');
+    const contentType = String(response.headers['content-type'] || targetMimeType);
     const base64 = Buffer.from(response.data).toString('base64');
     return `data:${contentType};base64,${base64}`;
   } catch (err: any) {

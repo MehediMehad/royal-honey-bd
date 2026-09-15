@@ -105,7 +105,7 @@ const extractionTools: any[] = [
           isOrderConfirmed: {
             type: 'boolean',
             description:
-              'True ONLY if customer explicitly confirms placing the order (e.g. হ্যাঁ, কনফার্ম, Confirm, অর্ডার করুন, জি পাঠান, ঠিক আছে পাঠান)',
+              'True ONLY if customer explicitly confirms dispatching/finalizing an already reviewed order (e.g. সব ঠিক আছে পাঠান, অর্ডার কনফার্ম করুন, Confirm, জি পাঠান, পাঠায় দিয়েন, ঠিক আছে পাঠান). False if customer is merely answering whether they want to take or buy a product (e.g. Hea ami chai, নিতে চাই, দেন).',
           },
         },
       },
@@ -175,7 +175,12 @@ When extracting cartActions:
 - If customer mentions any product (including typos like "হানি নার্স" for Honey Nut, or Banglish like "sorisha modhu", or "৩টা কম্বো"), match it to the exact matched Product ID from the catalog and set productId.
 - If customer changes quantity or clarifies total count wanted (e.g. "ami dui 2 ta nite chai", "২টা লাগবে", "২টা দেন", "২টি নিব", "১টা বাদ দেন"):
   Look at the product in the customer's current cart or the product discussed in the recent conversation. Set action to 'UPDATE' with that productId and the requested total quantity (e.g. 2). DO NOT use 'ADD' if the customer is clarifying or changing the count for an already selected item.
-- If unsure of exact product ID, leave productId as null and set productKeyword.`,
+- If unsure of exact product ID, leave productId as null and set productKeyword.
+
+When determining isOrderConfirmed vs isOrderIntent:
+- isOrderConfirmed should ONLY be true if customer explicitly confirms placing or sending an already reviewed order (e.g. "সব ঠিক আছে পাঠান", "অর্ডার কনফার্ম করুন", "Confirm", "জি পাঠান", "পাঠায় দিয়েন", "ঠিক আছে পাঠান", "yes confirm", "ok confirm").
+- If the customer is merely expressing intent to take or buy a product (e.g. "Hea ami chai", "হ্যাঁ আমি চাই", "হ্যাঁ নিব", "নিতে চাই", "১টা দিন", "নিতে ইচ্ছা আছে"):
+  Set isOrderIntent = true and isOrderConfirmed = false. NEVER set isOrderConfirmed = true when customer is simply answering that they want a product.`,
         },
         {
           role: 'user',
@@ -306,10 +311,17 @@ const heuristicFallbackExtraction = (
 
   // 6. Explicit order confirmation detection
   const clean = text.trim();
-  const isConfirmWord =
-    /^(হ্যাঁ|হ্যা|জি|confirm|কনফার্ম|yes|ok|ঠিক আছে|অর্ডার করুন|পাঠিয়ে দিন|পাঠান)\b/i.test(clean) ||
-    /(অর্ডার\s*কনফার্ম|অর্ডারটি\s*কনফার্ম|অর্ডার\s*করুন|পাঠিয়ে\s*দিন|পাঠিয়ে\s*দেন|কনফার্ম\s*করলাম)/i.test(clean);
-  if (isConfirmWord) {
+  const hasIntentWords = /(চাই|নিতে|নেব|ইচ্ছা|লাগবে|দিন|দেন|chai|nite|nibo)/i.test(clean);
+  const isExplicitConfirm =
+    /(সব\s*ঠিক\s*আছে|অর্ডার\s*কনফার্ম|অর্ডারটি\s*কনফার্ম|অর্ডার\s*করুন|পাঠিয়ে\s*(দিন|দেন)|পাঠান|কনফার্ম\s*করলাম|confirm\s*(kore\s*den|koren)|thik\s*ase\s*pathan)/i.test(
+      clean,
+    );
+
+  if (isExplicitConfirm && !hasIntentWords) {
+    result.isOrderConfirmed = true;
+  } else if (/^(confirm|কনফার্ম|yes\s*confirm|ok\s*confirm)$/i.test(clean)) {
+    result.isOrderConfirmed = true;
+  } else if (/^(হ্যাঁ|হ্যা|জি|yes|ok|ঠিক আছে)$/i.test(clean) && !hasIntentWords) {
     result.isOrderConfirmed = true;
   }
 

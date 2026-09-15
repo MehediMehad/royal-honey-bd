@@ -132,6 +132,39 @@ const formatOrderSummary = (session: ICustomerSession): string => {
 };
 
 /**
+ * Calculate dynamic expected delivery timeline with Bengali days and dates
+ */
+export const getDeliveryTimelineString = (
+  district?: string | null,
+  orderDate: Date = new Date(),
+): string => {
+  const isDhaka = district?.toLowerCase().includes('dhaka') || district?.includes('ঢাকা');
+  const minDays = isDhaka ? 1 : 2;
+  const maxDays = isDhaka ? 2 : 3;
+
+  const minDate = new Date(orderDate.getTime() + minDays * 24 * 60 * 60 * 1000);
+  const maxDate = new Date(orderDate.getTime() + maxDays * 24 * 60 * 60 * 1000);
+
+  const banglaDays = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  const banglaMonths = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
+  ];
+  const toBn = (n: number) => n.toString().replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[+d]);
+
+  const minDayName = banglaDays[minDate.getDay()];
+  const maxDayName = banglaDays[maxDate.getDay()];
+  const minDayNum = toBn(minDate.getDate());
+  const maxDayNum = toBn(maxDate.getDate());
+  const monthName = banglaMonths[minDate.getMonth()];
+
+  if (minDate.getMonth() === maxDate.getMonth()) {
+    return `ইনশাআল্লাহ আগামী ${minDayName} বা ${maxDayName} (${minDayNum}-${maxDayNum} ${monthName})-এর মধ্যে`;
+  }
+  return `ইনশাআল্লাহ আগামী ${minDayName} (${minDayNum} ${monthName}) বা ${maxDayName} (${maxDayNum} ${banglaMonths[maxDate.getMonth()]})-এর মধ্যে`;
+};
+
+/**
  * Describe remaining missing fields and provide smart order form template
  */
 const formatMissingFieldsPrompt = (session: ICustomerSession): string => {
@@ -139,11 +172,21 @@ const formatMissingFieldsPrompt = (session: ICustomerSession): string => {
   const hasItems = session.cart?.items && session.cart.items.length > 0;
 
   if (missingFields.length === 0 && hasItems) {
-    return `【অর্ডার সামারি নির্দেশনা】:
-গ্রাহকের নাম, ফোন, জেলা, ডেলিভারি ঠিকানা ও প্রোডাক্টের তথ্য সম্পূর্ণ পাওয়া গেছে!
-এখন হুবহু নিচের Order Summary ফরম্যাটে উপস্থাপন করে কাস্টমারের কাছ থেকে কনফার্মেশন চেয়ে নিন:
+    return `【অর্ডার সামারি নির্দেশনা (পূর্ববর্তী কাস্টমার / সম্পূর্ণ তথ্য প্রাপ্ত)】:
+গ্রাহকের নাম (${session.name}), ফোন (${session.phone}), জেলা (${session.district}), সম্পূর্ণ ডেলিভারি ঠিকানা (${session.fullAddress}) এবং কার্ট আইটেম অলরেডি সংরক্ষিত আছে!
+⚠️ ভুলেও কাস্টমারকে নতুন করে নাম, ফোন বা ঠিকানার খালি ফর্ম পাঠাবেন না! পূর্বে দেওয়া তথ্য কখনোই আবার চাইবেন না!
+গ্রাহক নিতে চাওয়া মাত্রই সরাসরি নিচের সম্পূর্ণ Order Summary হুবহু উপস্থাপন করুন এবং নিশ্চিত হোন:
 
-${formatOrderSummary(session)}`;
+${formatOrderSummary(session)}
+
+ভাইয়া, আপনার পূর্বে সংরক্ষিত এই ঠিকানাতেই কি পার্সেলটি পাঠিয়ে দেব, নাকি কোনো তথ্য বা ঠিকানা পরিবর্তন করতে চান?
+সব ঠিক থাকলে "Confirm" বা "পাঠিয়ে দিন" লিখলেই আমরা দ্রুত পার্সেল রেডি করে পাঠিয়ে দেব। আর কোনো কিছু পরিবর্তন করতে চাইলে লিখে জানান ভাইয়া। 😊`;
+  }
+
+  if (missingFields.length === 1 && missingFields[0] === 'items') {
+    return `【পূর্ববর্তী কাস্টমার - শুধু পণ্য নির্বাচন প্রয়োজন】:
+গ্রাহকের নাম (${session.name}), ফোন (${session.phone}), জেলা (${session.district}), এবং ঠিকানা (${session.fullAddress}) অলরেডি সংরক্ষিত আছে!
+গ্রাহকের কাছে ভুলেও নাম, ফোন বা ঠিকানা পুনরায় চাইতে যাবেন না। শুধু বিনীতভাবে জানতে চান তিনি কোন প্রোডাক্ট কতটি নিতে চান।`;
   }
 
   const formTemplate = formatOrderInformationForm(session);
@@ -163,13 +206,22 @@ ${formatOrderSummary(session)}`;
     }
   });
 
+  const knownFields: string[] = [];
+  if (session.name) knownFields.push(`নাম: ${session.name}`);
+  if (session.phone) knownFields.push(`ফোন: ${session.phone}`);
+  if (session.district) knownFields.push(`জেলা: ${session.district}`);
+  if (session.fullAddress) knownFields.push(`ঠিকানা: ${session.fullAddress}`);
+
   return `【অর্ডার ফরম ও তথ্য সংগ্রহের নির্দেশনা】:
-কাস্টমার যখন অর্ডার করতে চায় বা নিতে চায়, তখন অর্ডারের জন্য প্রয়োজনীয় তথ্যগুলো ঠিক নিচের স্মার্ট ফরম্যাটে তুলে ধরুন:
+${knownFields.length > 0 ? `গ্রাহকের সংরক্ষিত তথ্য: ${knownFields.join(', ')}। এই তথ্যগুলো ফর্মে পূর্বনির্ধারিত থাকবে, কখনোই নতুন করে আবার চাইবেন না!` : ''}
+বাকি থাকা প্রয়োজনীয় ফিল্ড: ${missingLabels.join(', ')}
+
+কাস্টমার অর্ডার করতে চাইলে নিচের ফর্মে ইতোমধ্যে প্রাপ্ত তথ্য বসিয়ে বাকি খালি ফিল্ডগুলো বিনীতভাবে চেয়ে নিন:
 
 ${formTemplate}
 
 নোট:
-- উপরের ফর্মে ইতোমধ্যে প্রাপ্ত তথ্য (যেমন: জেলা, প্রোডাক্ট নাম, সংখ্যা) থাকলে তা বসিয়ে রাখবেন এবং বাকি খালি ফিল্ডগুলো (${missingLabels.join(', ')}) কাস্টমারের কাছ থেকে বিনীতভাবে চেয়ে নেবেন।
+- গ্রাহক যে তথ্য একবার দিয়েছে (যেমন: নাম, ফোন বা ঠিকানা), তা ফর্মে বসিয়ে রাখবেন এবং ভুলেও পুনরায় চাইবেন না। শুধু অনুপস্থিত বা অসম্পূর্ণ তথ্য চেয়ে মিষ্টি করে মেসেজ দিন।
 - ফোন নম্বর ভুল বা কম ডিজিটের হলে আবার সঠিক ১১ ডিজিটের নম্বর চাইবেন। ঠিকানা অসম্পূর্ণ হলে পূর্ণ বাসা/রোড/এলাকা চাইবেন।`;
 };
 
@@ -178,6 +230,7 @@ export const CustomerServices = {
   formatOrderInformationForm,
   formatOrderSummary,
   formatMissingFieldsPrompt,
+  getDeliveryTimelineString,
 };
 
 

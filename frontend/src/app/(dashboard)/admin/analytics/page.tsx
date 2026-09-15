@@ -74,7 +74,7 @@ export default function AnalyticsPage() {
       }
     } catch (err) {
       console.error("Failed to load analytics overview", err);
-      toast.error("Failed to load business intelligence data");
+      toast.error("বিজনেস ইন্টেলিজেন্স ডাটা লোড করতে ব্যর্থ হয়েছে");
     }
   }, []);
 
@@ -122,12 +122,14 @@ export default function AnalyticsPage() {
     try {
       const res = await analyticsService.retryDlqJob(jobId);
       if (res.success) {
-        toast.success(`Job #${jobId} re-enqueued for execution`);
+        toast.success(`জব #${jobId} পুনরায় কিউতে যুক্ত করা হয়েছে`);
         setSelectedJob(null);
         fetchDlq();
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to retry job");
+      toast.error(
+        err instanceof Error ? err.message : "জব পুনরায় চেষ্টা করতে ব্যর্থ হয়েছে"
+      );
     } finally {
       setIsActionLoading(false);
     }
@@ -138,28 +140,31 @@ export default function AnalyticsPage() {
     try {
       const res = await analyticsService.retryAllDlq();
       if (res.success) {
-        toast.success(`Re-enqueued ${res.data?.retriedCount || 0} failed jobs`);
+        toast.success(
+          `${res.data?.retriedCount || 0}টি ব্যর্থ জব পুনরায় কিউতে পাঠানো হয়েছে`
+        );
         fetchDlq();
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to retry all jobs");
+      toast.error(
+        err instanceof Error ? err.message : "সব জব পুনরায় চেষ্টা করতে ব্যর্থ হয়েছে"
+      );
     } finally {
       setIsActionLoading(false);
     }
   };
 
   const handleCleanDlq = async () => {
-    if (!confirm("Are you sure you want to clean and clear all failed jobs in DLQ?"))
-      return;
+    if (!confirm("আপনি কি নিশ্চিত যে আপনি DLQ-এর সকল ব্যর্থ জব মুছে ফেলতে চান?")) return;
     setIsActionLoading(true);
     try {
       const res = await analyticsService.cleanDlq();
       if (res.success) {
-        toast.success("Dead-letter queue purged successfully");
+        toast.success("DLQ সফলভাবে পরিষ্কার করা হয়েছে");
         fetchDlq();
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to clean DLQ");
+      toast.error(err instanceof Error ? err.message : "DLQ পরিষ্কার করতে ব্যর্থ হয়েছে");
     } finally {
       setIsActionLoading(false);
     }
@@ -173,13 +178,13 @@ export default function AnalyticsPage() {
       if (res.success) {
         toast.success(
           cartId
-            ? "Follow-up message dispatched to customer"
-            : `Batch triggered ${res.data?.triggeredCount || 0} follow-up messages`
+            ? "গ্রাহককে সফলভাবে ফলো-আপ মেসেজ পাঠানো হয়েছে"
+            : `একসাথে ${res.data?.triggeredCount || 0}টি ফলো-আপ মেসেজ পাঠানো হয়েছে`
         );
         fetchAbandoned();
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to trigger follow-up");
+      toast.error(err instanceof Error ? err.message : "ফলো-আপ পাঠাতে ব্যর্থ হয়েছে");
     } finally {
       setIsActionLoading(false);
     }
@@ -197,14 +202,14 @@ export default function AnalyticsPage() {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-xs font-bold uppercase tracking-wider backdrop-blur-xs">
             <Sparkles className="size-3.5 text-yellow-300" />
-            Phase 12: Business Intelligence & Scaling
+            বিজনেস ইন্টেলিজেন্স ও গ্রোথ অ্যানালিটিক্স
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Analytics & Growth Suite 📈
+            অ্যানালিটিক্স ও গ্রোথ ড্যাশবোর্ড 📈
           </h2>
           <p className="text-sm text-amber-100 max-w-xl leading-relaxed">
-            Live revenue metrics, AI conversion funnel, automated abandoned cart recovery,
-            and BullMQ dead-letter queue (DLQ) health monitor.
+            লাইভ রেভিনিউ মেট্রিক্স, এআই কনভার্সন ফানেল, অসম্পূর্ণ কার্ট রিকভারি এবং
+            সার্ভার কিউ ও ওয়ার্কার স্বাস্থ্য পর্যবেক্ষণ।
           </p>
         </div>
 
@@ -215,7 +220,7 @@ export default function AnalyticsPage() {
             className="rounded-xl bg-white/20 hover:bg-white/30 text-white font-bold border-0 backdrop-blur-xs"
           >
             <RefreshCw className={`size-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-            Refresh
+            রিফ্রেশ করুন
           </Button>
         </div>
       </div>
@@ -231,7 +236,7 @@ export default function AnalyticsPage() {
           }`}
         >
           <BarChart3 className="size-4 text-amber-500" />
-          Business Intelligence
+          বিজনেস ইন্টেলিজেন্স
         </button>
         <button
           onClick={() => setActiveTab("growth")}
@@ -242,7 +247,7 @@ export default function AnalyticsPage() {
           }`}
         >
           <ShoppingCart className="size-4 text-emerald-500" />
-          Abandoned Carts
+          অসম্পূর্ণ কার্ট
           {abandonedData?.totalAbandoned ? (
             <Badge className="bg-amber-500/20 text-amber-700 hover:bg-amber-500/20 font-bold px-1.5 py-0.5 text-[10px]">
               {abandonedData.totalAbandoned}
@@ -258,10 +263,10 @@ export default function AnalyticsPage() {
           }`}
         >
           <Server className="size-4 text-blue-500" />
-          DLQ & Worker Scaling
+          সার্ভার কিউ ও স্কেলিং
           {dlqMetrics?.failed ? (
             <Badge className="bg-rose-500/20 text-rose-700 hover:bg-rose-500/20 font-bold px-1.5 py-0.5 text-[10px]">
-              {dlqMetrics.failed} failed
+              {dlqMetrics.failed}টি ব্যর্থ
             </Badge>
           ) : null}
         </button>
@@ -272,7 +277,7 @@ export default function AnalyticsPage() {
         <div className="space-y-8 animate-in fade-in duration-300">
           {/* Timeframe Bar & Top Stats */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <h3 className="text-lg font-bold">Revenue & Conversion Overview</h3>
+            <h3 className="text-lg font-bold">বিক্রি ও কনভার্সন সারসংক্ষেপ</h3>
             <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-xl border border-border">
               {(["7d", "30d", "90d", "1y"] as const).map((tf) => (
                 <button
@@ -285,12 +290,12 @@ export default function AnalyticsPage() {
                   }`}
                 >
                   {tf === "7d"
-                    ? "7 Days"
+                    ? "৭ দিন"
                     : tf === "30d"
-                      ? "30 Days"
+                      ? "৩০ দিন"
                       : tf === "90d"
-                        ? "90 Days"
-                        : "1 Year"}
+                        ? "৯০ দিন"
+                        : "১ বছর"}
                 </button>
               ))}
             </div>
@@ -301,7 +306,7 @@ export default function AnalyticsPage() {
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Total Revenue
+                  মোট বিক্রি (রেভিনিউ)
                 </span>
                 <div className="size-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                   <TrendingUp className="size-5" />
@@ -312,7 +317,7 @@ export default function AnalyticsPage() {
                   ৳{(overview?.summary.totalRevenue || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Avg. ৳{overview?.summary.avgOrderValue || 0} per confirmed order
+                  নিশ্চিত অর্ডার প্রতি গড় ৳{overview?.summary.avgOrderValue || 0}
                 </p>
               </div>
             </div>
@@ -320,7 +325,7 @@ export default function AnalyticsPage() {
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Confirmed Orders
+                  নিশ্চিত অর্ডার
                 </span>
                 <div className="size-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
                   <ShoppingCart className="size-5" />
@@ -328,10 +333,10 @@ export default function AnalyticsPage() {
               </div>
               <div>
                 <p className="text-2xl sm:text-3xl font-black tracking-tight">
-                  {overview?.summary.totalOrders || 0}
+                  {overview?.summary.totalOrders || 0}টি
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  From {overview?.summary.activeCustomers || 0} unique active customers
+                  {overview?.summary.activeCustomers || 0} জন সক্রিয় ক্রেতা থেকে
                 </p>
               </div>
             </div>
@@ -339,7 +344,7 @@ export default function AnalyticsPage() {
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  AI Conversion Rate
+                  এআই কনভার্সন রেট
                 </span>
                 <div className="size-9 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
                   <Bot className="size-5" />
@@ -350,7 +355,7 @@ export default function AnalyticsPage() {
                   {overview?.conversionFunnel.overallConversionRate || 0}%
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Chat visitors converting into paid orders
+                  চ্যাট ভিজিটরদের সফল পেইড অর্ডারে রূপান্তরের হার
                 </p>
               </div>
             </div>
@@ -358,7 +363,7 @@ export default function AnalyticsPage() {
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Courier Success Rate
+                  কুরিয়ার ডেলিভারি সাকসেস
                 </span>
                 <div className="size-9 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
                   <Truck className="size-5" />
@@ -369,7 +374,7 @@ export default function AnalyticsPage() {
                   {overview?.courierMetrics.successRate || 100}%
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Return rate: {overview?.courierMetrics.returnRate || 0}%
+                  রিটার্ন রেট: {overview?.courierMetrics.returnRate || 0}%
                 </p>
               </div>
             </div>
@@ -379,16 +384,17 @@ export default function AnalyticsPage() {
           <div className="p-6 rounded-3xl border border-border bg-card shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h4 className="text-base font-bold">Daily Revenue & Order Volume</h4>
+                <h4 className="text-base font-bold">দৈনিক বিক্রি ও অর্ডার পরিমাণ</h4>
                 <p className="text-xs text-muted-foreground">
-                  Interactive sales trend for the past{" "}
+                  বিগত{" "}
                   {timeframe === "7d"
-                    ? "7 days"
+                    ? "৭ দিনের"
                     : timeframe === "30d"
-                      ? "30 days"
+                      ? "৩০ দিনের"
                       : timeframe === "90d"
-                        ? "90 days"
-                        : "year"}
+                        ? "৯০ দিনের"
+                        : "১ বছরের"}{" "}
+                  বিক্রির ইন্টারেক্টিভ পরিসংখ্যান
                 </p>
               </div>
               {hoveredPoint && (
@@ -398,7 +404,7 @@ export default function AnalyticsPage() {
                     ৳{hoveredPoint.revenue.toLocaleString()}
                   </span>
                   <span className="text-muted-foreground">
-                    ({hoveredPoint.orderCount} orders)
+                    ({hoveredPoint.orderCount}টি অর্ডার)
                   </span>
                 </div>
               )}
@@ -425,14 +431,14 @@ export default function AnalyticsPage() {
                         {/* Tooltip on hover */}
                         {isHovered && (
                           <div className="absolute -top-10 z-10 px-2 py-1 rounded-md bg-foreground text-background text-[10px] font-bold whitespace-nowrap pointer-events-none shadow-md">
-                            ৳{pt.revenue.toLocaleString()} ({pt.orderCount})
+                            ৳{pt.revenue.toLocaleString()} ({pt.orderCount}টি)
                           </div>
                         )}
 
                         {/* Bar */}
                         <div
                           style={{ height: `${heightPercent}%` }}
-                          className={`w-full max-w-[28px] rounded-t-lg transition-all duration-200 ${
+                          className={`w-full max-w-7 rounded-t-lg transition-all duration-200 ${
                             isHovered
                               ? "bg-amber-500 shadow-md shadow-amber-500/40"
                               : pt.revenue > 0
@@ -454,7 +460,7 @@ export default function AnalyticsPage() {
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
-                  No revenue data available for selected timeframe
+                  নির্বাচিত সময়ের জন্য বিক্রির কোনো তথ্য পাওয়া যায়নি
                 </div>
               )}
             </div>
@@ -467,23 +473,23 @@ export default function AnalyticsPage() {
               <div>
                 <h4 className="text-base font-bold flex items-center gap-2">
                   <Bot className="size-4 text-purple-500" />
-                  AI Chat-to-Order Conversion Funnel
+                  এআই চ্যাট থেকে অর্ডার কনভার্সন ফানেল
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  How incoming conversations convert into confirmed customer orders
+                  ইনবক্সের কথোপকথন কীভাবে নিশ্চিত গ্রাহক অর্ডারে রূপান্তরিত হচ্ছে
                 </p>
               </div>
 
               <div className="space-y-4">
                 {[
                   {
-                    label: "1. Total Conversations",
+                    label: "১. মোট কথোপকথন",
                     count: overview?.conversionFunnel.totalConversations || 0,
                     percent: 100,
                     color: "bg-blue-500",
                   },
                   {
-                    label: "2. Unique Customers",
+                    label: "২. একক ক্রেতা/গ্রাহক",
                     count: overview?.conversionFunnel.uniqueCustomers || 0,
                     percent: overview?.conversionFunnel.totalConversations
                       ? Math.round(
@@ -495,7 +501,7 @@ export default function AnalyticsPage() {
                     color: "bg-amber-500",
                   },
                   {
-                    label: "3. Items Added to Cart",
+                    label: "৩. কার্টে পণ্য যোগ করেছে",
                     count: overview?.conversionFunnel.cartsCreated || 0,
                     percent: overview?.conversionFunnel.uniqueCustomers
                       ? Math.round(
@@ -507,7 +513,7 @@ export default function AnalyticsPage() {
                     color: "bg-orange-500",
                   },
                   {
-                    label: "4. Confirmed Orders",
+                    label: "৪. নিশ্চিত অর্ডার সম্পন্ন",
                     count: overview?.conversionFunnel.ordersConfirmed || 0,
                     percent: overview?.conversionFunnel.overallConversionRate || 0,
                     color: "bg-emerald-500",
@@ -534,33 +540,33 @@ export default function AnalyticsPage() {
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
                 <div className="p-3 rounded-xl bg-muted/40 border border-border space-y-1">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                    Facebook Messenger
+                    ফেসবুক মেসেঞ্জার
                   </span>
                   <p className="text-lg font-black text-blue-600">
                     {overview?.conversionFunnel.channelBreakdown.facebook.rate || 0}%
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {overview?.conversionFunnel.channelBreakdown.facebook.orders || 0}{" "}
-                    orders /{" "}
+                    {overview?.conversionFunnel.channelBreakdown.facebook.orders || 0}টি
+                    অর্ডার /{" "}
                     {overview?.conversionFunnel.channelBreakdown.facebook.conversations ||
-                      0}{" "}
-                    chats
+                      0}
+                    টি চ্যাট
                   </p>
                 </div>
 
                 <div className="p-3 rounded-xl bg-muted/40 border border-border space-y-1">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">
-                    WhatsApp Chat
+                    হোয়াটসঅ্যাপ চ্যাট
                   </span>
                   <p className="text-lg font-black text-emerald-600">
                     {overview?.conversionFunnel.channelBreakdown.whatsapp.rate || 0}%
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {overview?.conversionFunnel.channelBreakdown.whatsapp.orders || 0}{" "}
-                    orders /{" "}
+                    {overview?.conversionFunnel.channelBreakdown.whatsapp.orders || 0}টি
+                    অর্ডার /{" "}
                     {overview?.conversionFunnel.channelBreakdown.whatsapp.conversations ||
-                      0}{" "}
-                    chats
+                      0}
+                    টি চ্যাট
                   </p>
                 </div>
               </div>
@@ -571,10 +577,10 @@ export default function AnalyticsPage() {
               <div>
                 <h4 className="text-base font-bold flex items-center gap-2">
                   <Package className="size-4 text-amber-500" />
-                  Best-Selling Product Breakdown
+                  সর্বাধিক বিক্রিত পণ্যের তালিকা
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Revenue and units sold by product category
+                  পণ্য অনুযায়ী মোট বিক্রি ও বিক্রিত পরিমাণ
                 </p>
               </div>
 
@@ -587,7 +593,7 @@ export default function AnalyticsPage() {
                         <span>
                           ৳{prod.revenue.toLocaleString()}{" "}
                           <span className="text-muted-foreground font-normal">
-                            ({prod.unitsSold} units · {prod.percentage}%)
+                            ({prod.unitsSold}টি · {prod.percentage}%)
                           </span>
                         </span>
                       </div>
@@ -601,7 +607,7 @@ export default function AnalyticsPage() {
                   ))
                 ) : (
                   <div className="py-8 text-center text-xs text-muted-foreground">
-                    No product sales recorded yet in this timeframe
+                    এই নির্বাচিত সময়ে কোনো পণ্য বিক্রির রেকর্ড নেই
                   </div>
                 )}
               </div>
@@ -616,19 +622,19 @@ export default function AnalyticsPage() {
                 <div>
                   <h4 className="text-base font-bold flex items-center gap-2">
                     <HelpCircle className="size-4 text-rose-500" />
-                    Human Handoff Rate & Reasons
+                    ম্যানুয়াল টেকওভারের হার ও কারণ
                   </h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Handoff rate: {overview?.handoffAnalytics.handoffRate || 0}% of all
-                    chats
+                    টেকওভার রেট: মোট চ্যাটের {overview?.handoffAnalytics.handoffRate || 0}
+                    %
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className="bg-rose-500/10 text-rose-600 border border-rose-500/20 font-bold">
-                    {overview?.handoffAnalytics.openHandoffs || 0} Open
+                    {overview?.handoffAnalytics.openHandoffs || 0}টি পেন্ডিং
                   </Badge>
                   <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold">
-                    {overview?.handoffAnalytics.resolvedHandoffs || 0} Resolved
+                    {overview?.handoffAnalytics.resolvedHandoffs || 0}টি সম্পন্ন
                   </Badge>
                 </div>
               </div>
@@ -642,13 +648,13 @@ export default function AnalyticsPage() {
                     >
                       <span className="font-semibold">{r.reason}</span>
                       <span className="font-bold text-muted-foreground">
-                        {r.count} times ({r.percentage}%)
+                        {r.count} বার ({r.percentage}%)
                       </span>
                     </div>
                   ))
                 ) : (
                   <div className="py-6 text-center text-xs text-muted-foreground">
-                    No human handoffs triggered in this timeframe
+                    এই নির্বাচিত সময়ে কোনো ম্যানুয়াল টেকওভারের প্রয়োজন হয়নি
                   </div>
                 )}
               </div>
@@ -659,17 +665,17 @@ export default function AnalyticsPage() {
               <div>
                 <h4 className="text-base font-bold flex items-center gap-2">
                   <Truck className="size-4 text-emerald-500" />
-                  Courier Delivery Success vs Return Rate
+                  কুরিয়ার ডেলিভারি সাফল্য বনাম রিটার্ন
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Steadfast Courier logistics performance metrics
+                  স্টিডফাস্ট কুরিয়ার পারফরম্যান্স মেট্রিক্স
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center space-y-1">
                   <span className="text-[10px] font-bold text-emerald-700 uppercase">
-                    Delivered
+                    ডেলিভারড
                   </span>
                   <p className="text-xl font-black text-emerald-600">
                     {overview?.courierMetrics.delivered || 0}
@@ -681,17 +687,17 @@ export default function AnalyticsPage() {
 
                 <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-center space-y-1">
                   <span className="text-[10px] font-bold text-blue-700 uppercase">
-                    In Transit
+                    ইন ট্রানজিট
                   </span>
                   <p className="text-xl font-black text-blue-600">
                     {overview?.courierMetrics.inTransit || 0}
                   </p>
-                  <span className="text-[10px] text-muted-foreground">On the way</span>
+                  <span className="text-[10px] text-muted-foreground">ডেলিভারির পথে</span>
                 </div>
 
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-center space-y-1">
                   <span className="text-[10px] font-bold text-rose-700 uppercase">
-                    Returned
+                    রিটার্ন হয়েছে
                   </span>
                   <p className="text-xl font-black text-rose-600">
                     {overview?.courierMetrics.returned || 0}
@@ -704,10 +710,10 @@ export default function AnalyticsPage() {
 
               <div className="p-3.5 rounded-2xl bg-muted/40 border border-border flex items-center justify-between text-xs">
                 <span className="font-semibold text-muted-foreground">
-                  Total Courier Booked Parcels
+                  কুরিয়ারে পাঠানো মোট পার্সেল
                 </span>
                 <span className="font-bold text-foreground">
-                  {overview?.courierMetrics.totalBooked || 0} parcels
+                  {overview?.courierMetrics.totalBooked || 0}টি পার্সেল
                 </span>
               </div>
             </div>
@@ -722,56 +728,56 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Abandoned Carts
+                অসম্পূর্ণ কার্ট
               </span>
               <div>
                 <p className="text-2xl sm:text-3xl font-black text-amber-600">
-                  {abandonedData?.totalAbandoned || 0}
+                  {abandonedData?.totalAbandoned || 0}টি
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Idle for &gt; 1 hour with items
+                  পণ্য রেখে ১ ঘণ্টার বেশি নিষ্ক্রিয়
                 </p>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Recoverable Value
+                সম্ভাব্য রিকভারি মূল্য
               </span>
               <div>
                 <p className="text-2xl sm:text-3xl font-black text-emerald-600">
                   ৳{(abandonedData?.recoverableValue || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Potential revenue in pending carts
+                  অসম্পূর্ণ কার্টে আটকে থাকা রেভিনিউ
                 </p>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Recovered Customers
+                রিকভার্ড গ্রাহক
               </span>
               <div>
                 <p className="text-2xl sm:text-3xl font-black text-blue-600">
-                  {abandonedData?.recoveredCount || 0}
+                  {abandonedData?.recoveredCount || 0} জন
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Placed order after follow-up
+                  ফলো-আপের পর সফলভাবে অর্ডার করেছেন
                 </p>
               </div>
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-3">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                Recovery Rate
+                রিকভারি রেট
               </span>
               <div>
                 <p className="text-2xl sm:text-3xl font-black text-purple-600">
                   {abandonedData?.recoveryRate || 0}%
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Successful cart re-engagements
+                  সফলভাবে কার্ট ফিরে আসার হার
                 </p>
               </div>
             </div>
@@ -781,11 +787,11 @@ export default function AnalyticsPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
             <div>
               <h4 className="text-sm font-bold text-amber-900">
-                Automated Re-engagement Engine (WhatsApp & Messenger)
+                স্বয়ংক্রিয় রিকভারি ইঞ্জিন (হোয়াটসঅ্যাপ ও ফেসবুক মেসেঞ্জার)
               </h4>
               <p className="text-xs text-amber-800/80 mt-0.5">
-                The system automatically triggers polite follow-up messages every 30
-                minutes, or you can trigger an instant batch.
+                সিস্টেম প্রতি ৩০ মিনিট পরপর স্বয়ংক্রিয়ভাবে ফলো-আপ পাঠায়, অথবা আপনি এখনই
+                সবাইকে একসাথে মেসেজ পাঠাতে পারেন।
               </p>
             </div>
             <Button
@@ -797,16 +803,16 @@ export default function AnalyticsPage() {
               className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md"
             >
               <Send className="size-4 mr-2" />
-              Batch Re-engage All Unsent
+              সকলকে একসাথে ফলো-আপ পাঠান
             </Button>
           </div>
 
           {/* Abandoned Carts Table */}
           <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-xs">
             <div className="p-5 border-b border-border">
-              <h4 className="text-base font-bold">Uncompleted Shopping Carts</h4>
+              <h4 className="text-base font-bold">অসম্পূর্ণ বা ফেলে রাখা শপিং কার্ট</h4>
               <p className="text-xs text-muted-foreground">
-                Customers who selected products but haven&apos;t confirmed checkout yet
+                যেসব ক্রেতা পণ্য নির্বাচন করেছেন কিন্তু অর্ডার সম্পন্ন করেননি
               </p>
             </div>
 
@@ -814,13 +820,13 @@ export default function AnalyticsPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/50 border-b border-border text-muted-foreground font-bold uppercase tracking-wider">
                   <tr>
-                    <th className="p-4">Customer</th>
-                    <th className="p-4">Channel</th>
-                    <th className="p-4">Items in Cart</th>
-                    <th className="p-4">Total Value</th>
-                    <th className="p-4">Last Active</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4">গ্রাহক / ক্রেতা</th>
+                    <th className="p-4">চ্যানেল</th>
+                    <th className="p-4">কার্টের পণ্যসমূহ</th>
+                    <th className="p-4">মোট মূল্য</th>
+                    <th className="p-4">শেষ সক্রিয় সময়</th>
+                    <th className="p-4">স্ট্যাটাস</th>
+                    <th className="p-4 text-right">পদক্ষেপ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -847,7 +853,7 @@ export default function AnalyticsPage() {
                         <td className="p-4 max-w-[240px]">
                           <p className="truncate font-medium">{cart.itemsSummary}</p>
                           <span className="text-[10px] text-muted-foreground">
-                            {cart.itemsCount} product(s)
+                            {cart.itemsCount}টি পণ্য
                           </span>
                         </td>
                         <td className="p-4 font-bold text-foreground">
@@ -863,11 +869,11 @@ export default function AnalyticsPage() {
                         <td className="p-4">
                           {cart.status === "FOLLOWUP_SENT" ? (
                             <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold">
-                              Follow-up Sent
+                              ফলো-আপ সম্পন্ন
                             </Badge>
                           ) : (
                             <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/20 font-bold">
-                              Pending Follow-up
+                              ফলো-আপ অপেক্ষমাণ
                             </Badge>
                           )}
                         </td>
@@ -880,7 +886,7 @@ export default function AnalyticsPage() {
                             className="rounded-xl font-bold text-xs"
                           >
                             <Send className="size-3.5 mr-1" />
-                            Re-engage
+                            ফলো-আপ পাঠান
                           </Button>
                         </td>
                       </tr>
@@ -891,7 +897,7 @@ export default function AnalyticsPage() {
                         colSpan={7}
                         className="p-8 text-center text-xs text-muted-foreground"
                       >
-                        No abandoned carts recorded at this time
+                        এই মুহূর্তে কোনো অসম্পূর্ণ কার্ট নেই
                       </td>
                     </tr>
                   )}
@@ -909,58 +915,60 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-2">
               <span className="text-xs font-bold text-muted-foreground uppercase">
-                Active Jobs
+                চলমান কাজ (Active)
               </span>
               <p className="text-2xl font-black text-blue-600">
-                {dlqMetrics?.active || 0}
+                {dlqMetrics?.active || 0}টি
               </p>
               <span className="text-[10px] text-muted-foreground">
-                Processing right now
+                বর্তমানে প্রসেস হচ্ছে
               </span>
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-2">
               <span className="text-xs font-bold text-muted-foreground uppercase">
-                Waiting Jobs
+                অপেক্ষমাণ কাজ (Waiting)
               </span>
               <p className="text-2xl font-black text-amber-600">
-                {dlqMetrics?.waiting || 0}
-              </p>
-              <span className="text-[10px] text-muted-foreground">In Redis queue</span>
-            </div>
-
-            <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-2">
-              <span className="text-xs font-bold text-muted-foreground uppercase">
-                Completed Jobs
-              </span>
-              <p className="text-2xl font-black text-emerald-600">
-                {dlqMetrics?.completed || 0}
+                {dlqMetrics?.waiting || 0}টি
               </p>
               <span className="text-[10px] text-muted-foreground">
-                Successfully resolved
+                রেডিস কিউতে অপেক্ষমাণ
               </span>
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-2">
               <span className="text-xs font-bold text-muted-foreground uppercase">
-                Failed (DLQ)
+                সম্পন্ন কাজ (Completed)
+              </span>
+              <p className="text-2xl font-black text-emerald-600">
+                {dlqMetrics?.completed || 0}টি
+              </p>
+              <span className="text-[10px] text-muted-foreground">সফলভাবে শেষ হয়েছে</span>
+            </div>
+
+            <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-2">
+              <span className="text-xs font-bold text-muted-foreground uppercase">
+                ব্যর্থ কাজ (DLQ)
               </span>
               <p className="text-2xl font-black text-rose-600">
-                {dlqMetrics?.failed || 0}
+                {dlqMetrics?.failed || 0}টি
               </p>
-              <span className="text-[10px] text-muted-foreground">Dead-letter queue</span>
+              <span className="text-[10px] text-muted-foreground">
+                ডেড-লেটার কিউতে জমা
+              </span>
             </div>
 
             <div className="p-5 rounded-2xl border border-border bg-card shadow-xs flex flex-col justify-between space-y-2">
               <span className="text-xs font-bold text-muted-foreground uppercase">
-                Worker Nodes
+                ওয়ার্কার নোডস
               </span>
               <div className="flex items-center gap-2">
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                <p className="text-base font-black text-foreground">AI + Media</p>
+                <p className="text-base font-black text-foreground">AI + মিডিয়া</p>
               </div>
               <span className="text-[10px] text-muted-foreground">
-                Horizontal scaling active
+                অটো স্কেলিং সক্রিয় রয়েছে
               </span>
             </div>
           </div>
@@ -968,10 +976,10 @@ export default function AnalyticsPage() {
           {/* Action Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl bg-muted/40 border border-border">
             <div>
-              <h4 className="text-sm font-bold">Dead-Letter Queue (DLQ) Manager</h4>
+              <h4 className="text-sm font-bold">ডেড-লেটার কিউ (DLQ) ম্যানেজার</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Inspect failed BullMQ jobs with error stack traces and re-enqueue with 1
-                click.
+                ব্যর্থ হওয়া কাজগুলোর ত্রুটি পর্যবেক্ষণ করুন এবং ১ ক্লিকে পুনরায় কিউতে
+                পাঠান।
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -981,7 +989,7 @@ export default function AnalyticsPage() {
                 className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
               >
                 <RotateCcw className="size-4 mr-2" />
-                Retry All Failed
+                সব ব্যর্থ জব পুনরায় চেষ্টা করুন
               </Button>
               <Button
                 onClick={handleCleanDlq}
@@ -990,7 +998,7 @@ export default function AnalyticsPage() {
                 className="rounded-xl font-bold"
               >
                 <Trash2 className="size-4 mr-2" />
-                Clean DLQ
+                DLQ খালি করুন
               </Button>
             </div>
           </div>
@@ -998,9 +1006,9 @@ export default function AnalyticsPage() {
           {/* Failed Jobs Table */}
           <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-xs">
             <div className="p-5 border-b border-border">
-              <h4 className="text-base font-bold">Failed Jobs in Dead-Letter Queue</h4>
+              <h4 className="text-base font-bold">ডেড-লেটার কিউতে থাকা ব্যর্থ কাজসমূহ</h4>
               <p className="text-xs text-muted-foreground">
-                Jobs that exhausted automated retry attempts and were parked in DLQ
+                যেসব কাজ স্বয়ংক্রিয় চেষ্টার পরেও ব্যর্থ হয়ে DLQ-তে জমা হয়েছে
               </p>
             </div>
 
@@ -1008,12 +1016,12 @@ export default function AnalyticsPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/50 border-b border-border text-muted-foreground font-bold uppercase tracking-wider">
                   <tr>
-                    <th className="p-4">Job ID</th>
-                    <th className="p-4">Queue</th>
-                    <th className="p-4">Attempts</th>
-                    <th className="p-4">Failed Reason</th>
-                    <th className="p-4">Timestamp</th>
-                    <th className="p-4 text-right">Action</th>
+                    <th className="p-4">জব আইডি</th>
+                    <th className="p-4">কিউ (Queue)</th>
+                    <th className="p-4">চেষ্টার সংখ্যা</th>
+                    <th className="p-4">ব্যর্থতার কারণ</th>
+                    <th className="p-4">সময়</th>
+                    <th className="p-4 text-right">পদক্ষেপ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -1028,7 +1036,7 @@ export default function AnalyticsPage() {
                             {job.queue}
                           </Badge>
                         </td>
-                        <td className="p-4 font-bold">{job.attemptsMade}</td>
+                        <td className="p-4 font-bold">{job.attemptsMade} বার</td>
                         <td className="p-4 max-w-[280px]">
                           <p className="truncate font-semibold text-rose-600">
                             {job.failedReason}
@@ -1044,7 +1052,7 @@ export default function AnalyticsPage() {
                             onClick={() => setSelectedJob(job)}
                             className="rounded-xl text-xs font-bold"
                           >
-                            Inspect
+                            বিবরণ দেখুন
                           </Button>
                           <Button
                             size="sm"
@@ -1053,7 +1061,7 @@ export default function AnalyticsPage() {
                             className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs"
                           >
                             <RotateCcw className="size-3.5 mr-1" />
-                            Retry
+                            পুনরায় চালান
                           </Button>
                         </td>
                       </tr>
@@ -1065,7 +1073,8 @@ export default function AnalyticsPage() {
                         className="p-8 text-center text-xs text-muted-foreground"
                       >
                         <CheckCircle2 className="size-8 text-emerald-500 mx-auto mb-2" />
-                        No failed jobs in Dead-Letter Queue. BullMQ queue health is 100%!
+                        ডেড-লেটার কিউতে কোনো ব্যর্থ জব নেই। সিস্টেম কিউ সম্পূর্ণ সুস্থ
+                        (১০০%)!
                       </td>
                     </tr>
                   )}
@@ -1083,17 +1092,17 @@ export default function AnalyticsPage() {
             <DialogHeader>
               <DialogTitle className="text-lg font-black flex items-center gap-2">
                 <AlertTriangle className="size-5 text-rose-500" />
-                DLQ Job #{selectedJob.id} Details
+                DLQ জব #{selectedJob.id} এর বিবরণ
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Error details, payload, and stack trace for troubleshooting
+                সমস্যা সমাধানের জন্য ত্রুটির বিবরণ, পেলোড ডাটা এবং স্ট্যাক ট্রেস
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 text-xs mt-4">
               <div>
                 <span className="font-bold text-muted-foreground uppercase text-[10px]">
-                  Failed Reason:
+                  ব্যর্থতার কারণ:
                 </span>
                 <p className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 font-semibold mt-1">
                   {selectedJob.failedReason}
@@ -1102,7 +1111,7 @@ export default function AnalyticsPage() {
 
               <div>
                 <span className="font-bold text-muted-foreground uppercase text-[10px]">
-                  Job Payload:
+                  জব পেলোড ডাটা:
                 </span>
                 <pre className="p-3 rounded-xl bg-muted/60 border border-border font-mono text-[11px] overflow-x-auto max-h-40 mt-1">
                   {JSON.stringify(selectedJob.data, null, 2)}
@@ -1112,7 +1121,7 @@ export default function AnalyticsPage() {
               {selectedJob.stacktrace?.length ? (
                 <div>
                   <span className="font-bold text-muted-foreground uppercase text-[10px]">
-                    Stack Trace:
+                    স্ট্যাক ট্রেস (Stack Trace):
                   </span>
                   <pre className="p-3 rounded-xl bg-muted/60 border border-border font-mono text-[10px] text-muted-foreground overflow-x-auto max-h-48 mt-1">
                     {selectedJob.stacktrace.join("\n")}
@@ -1126,7 +1135,7 @@ export default function AnalyticsPage() {
                   onClick={() => setSelectedJob(null)}
                   className="rounded-xl font-bold"
                 >
-                  Close
+                  বন্ধ করুন
                 </Button>
                 <Button
                   onClick={() => handleRetryJob(selectedJob.id)}
@@ -1134,7 +1143,7 @@ export default function AnalyticsPage() {
                   className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold"
                 >
                   <RotateCcw className="size-4 mr-1.5" />
-                  Retry Job Now
+                  এখনই পুনরায় চালান
                 </Button>
               </div>
             </div>

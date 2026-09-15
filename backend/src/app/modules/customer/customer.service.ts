@@ -81,30 +81,103 @@ const updateCustomerProfile = async (
 };
 
 /**
- * Describe remaining missing fields in clear, polite Bangla
+ * Format Smart Order Information Form (pre-filling known info, leaving missing empty)
  */
-const formatMissingFieldsPrompt = (
-  missingFields: Array<'name' | 'phone' | 'fullAddress' | 'district' | 'items'>,
-): string => {
-  if (missingFields.length === 0) {
-    return 'গ্রাহকের নাম, ফোন নম্বর, জেলা, ঠিকানা ও পণ্যের তথ্য সম্পূর্ণ পাওয়া গেছে। এখন মধুর নাম, ডেলিভারি চার্জসহ মোট বিল সুন্দরভাবে সাজিয়ে ক্যাশ অন ডেলিভারি বা বিকাশ/নগদ পেমেন্ট কনফার্মেশনের জন্য মিষ্টি করে বলুন।';
+const formatOrderInformationForm = (session: ICustomerSession): string => {
+  const cartItems = session.cart?.items || [];
+  const productNames = cartItems.length > 0
+    ? cartItems.map((item) => item.productName).join(', ')
+    : '';
+  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  return `আপনার নাম: ${session.name || ''}
+ফোন নাম্বার: ${session.phone || ''}
+জেলা: ${session.district || ''}
+ডেলিভারি ঠিকানা: ${session.fullAddress || ''}
+প্রোডাক্ট নাম: ${productNames}
+প্রোডাক্ট সংখ্যা: ${totalQuantity > 0 ? totalQuantity : ''}`.trim();
+};
+
+/**
+ * Format Order Summary Card (Exact format requested by user)
+ */
+const formatOrderSummary = (session: ICustomerSession): string => {
+  const cart = session.cart;
+  const cartItems = cart.items || [];
+  const productNames = cartItems.map((item) => item.productName).join(', ');
+  const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  let priceCalculation = '';
+  if (cartItems.length === 1) {
+    const item = cartItems[0];
+    priceCalculation = `৳${item.unitPrice} × ${item.quantity} = ৳${item.totalPrice}`;
+  } else {
+    const lines = cartItems.map(
+      (item) => `${item.productName} (৳${item.unitPrice} × ${item.quantity} = ৳${item.totalPrice})`,
+    );
+    priceCalculation = `${lines.join(' + ')} = ৳${cart.productTotal}`;
   }
 
-  const fieldLabels: Record<string, string> = {
-    items: 'কোন মধু কতটুকু লাগবে',
-    name: 'নাম',
-    phone: 'মোবাইল নম্বর',
-    district: 'জেলা',
-    fullAddress: 'ডেলিভারি ঠিকানা',
-  };
+  return `আপনার নাম: ${session.name || ''}
+ফোন নাম্বার: ${session.phone || ''}
+জেলা: ${session.district || ''}
+ডেলিভারি ঠিকানা: ${session.fullAddress || ''}
+প্রোডাক্ট নাম: ${productNames}
+প্রোডাক্ট সংখ্যা: ${totalQuantity}
+টোটাল প্রোডাক্ট প্রাইস : ${priceCalculation}
+ডেলিভারি চার্জ : ৳${cart.deliveryCharge}
+প্রদান করতে হবে : ৳${cart.finalTotal} টাকা
 
-  const missingLabels = missingFields.map((f) => fieldLabels[f]);
+আপনার অর্ডারের সব তথ্য সঠিক আছে কি? আপনি Confirm করলে আপনার অর্ডারটি place করা হবে।`.trim();
+};
 
-  return `[সিস্টেম নোট]: অর্ডারের জন্য এখনো বাকি: ${missingLabels.join(', ')}। কাস্টমার যদি শুধু দাম বা বিস্তারিত জানতে চান, তবে পণ্যের গুণাগুণ ও দাম বলুন এবং তিনি নিতে চান কি না জিজ্ঞেস করুন। কাস্টমার অর্ডার করতে চাইলে বা নাম/ঠিকানা দিলে শুধুমাত্র বাকি তথ্যগুলো মানুষের মতো স্বাভাবিক ও মিষ্টি ভাষায় চেয়ে নিন।`;
+/**
+ * Describe remaining missing fields and provide smart order form template
+ */
+const formatMissingFieldsPrompt = (session: ICustomerSession): string => {
+  const missingFields = session.missingFields;
+  const hasItems = session.cart?.items && session.cart.items.length > 0;
+
+  if (missingFields.length === 0 && hasItems) {
+    return `【অর্ডার সামারি নির্দেশনা】:
+গ্রাহকের নাম, ফোন, জেলা, ডেলিভারি ঠিকানা ও প্রোডাক্টের তথ্য সম্পূর্ণ পাওয়া গেছে!
+এখন হুবহু নিচের Order Summary ফরম্যাটে উপস্থাপন করে কাস্টমারের কাছ থেকে কনফার্মেশন চেয়ে নিন:
+
+${formatOrderSummary(session)}`;
+  }
+
+  const formTemplate = formatOrderInformationForm(session);
+
+  const missingLabels = missingFields.map((f) => {
+    switch (f) {
+      case 'name':
+        return 'আপনার নাম';
+      case 'phone':
+        return '১১ ডিজিটের সচল মোবাইল নম্বর';
+      case 'district':
+        return 'জেলা';
+      case 'fullAddress':
+        return 'ডেলিভারি ঠিকানা (বাসা/রোড/এলাকা)';
+      case 'items':
+        return 'কোন প্রোডাক্ট কতটি লাগবে';
+    }
+  });
+
+  return `【অর্ডার ফরম ও তথ্য সংগ্রহের নির্দেশনা】:
+কাস্টমার যখন অর্ডার করতে চায় বা নিতে চায়, তখন অর্ডারের জন্য প্রয়োজনীয় তথ্যগুলো ঠিক নিচের স্মার্ট ফরম্যাটে তুলে ধরুন:
+
+${formTemplate}
+
+নোট:
+- উপরের ফর্মে ইতোমধ্যে প্রাপ্ত তথ্য (যেমন: জেলা, প্রোডাক্ট নাম, সংখ্যা) থাকলে তা বসিয়ে রাখবেন এবং বাকি খালি ফিল্ডগুলো (${missingLabels.join(', ')}) কাস্টমারের কাছ থেকে বিনীতভাবে চেয়ে নেবেন।
+- ফোন নম্বর ভুল বা কম ডিজিটের হলে আবার সঠিক ১১ ডিজিটের নম্বর চাইবেন। ঠিকানা অসম্পূর্ণ হলে পূর্ণ বাসা/রোড/এলাকা চাইবেন।`;
 };
 
 export const CustomerServices = {
   updateCustomerProfile,
+  formatOrderInformationForm,
+  formatOrderSummary,
   formatMissingFieldsPrompt,
 };
+
 

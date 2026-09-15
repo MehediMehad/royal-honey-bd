@@ -20,6 +20,7 @@ export interface IExtractedEntities {
   transactionId?: string | null;
   isOrderIntent?: boolean;
   isOrderConfirmed?: boolean;
+  isDamageComplaint?: boolean;
 }
 
 const extractionTools: any[] = [
@@ -28,7 +29,7 @@ const extractionTools: any[] = [
     function: {
       name: 'extractCustomerAndCartIntent',
       description:
-        'Extract customer personal details (name, phone, address, thana, district), cart actions, payment method, transaction ID, and explicit order confirmation from customer message.',
+        'Extract customer personal details (name, phone, address, thana, district), cart actions, payment method, transaction ID, damage complaints, and explicit order confirmation from customer message.',
       parameters: {
         type: 'object',
         properties: {
@@ -106,6 +107,11 @@ const extractionTools: any[] = [
             type: 'boolean',
             description:
               'True ONLY if customer explicitly confirms dispatching/finalizing an already reviewed order (e.g. সব ঠিক আছে পাঠান, অর্ডার কনফার্ম করুন, Confirm, জি পাঠান, পাঠায় দিয়েন, ঠিক আছে পাঠান). False if customer is merely answering whether they want to take or buy a product (e.g. Hea ami chai, নিতে চাই, দেন).',
+          },
+          isDamageComplaint: {
+            type: 'boolean',
+            description:
+              'True if customer is complaining about a broken jar, damaged packaging, leaking honey, broken parcel, defective product, or transit damage (e.g. বয়াম ভেঙে গেছে, মধু পড়ে গেছে, ভাঙা পার্সেল, নষ্ট, লিক হয়েছে, ক্ষতিগ্রস্ত).',
           },
         },
       },
@@ -323,6 +329,15 @@ const heuristicFallbackExtraction = (
     result.isOrderConfirmed = true;
   } else if (/^(হ্যাঁ|হ্যা|জি|yes|ok|ঠিক আছে)$/i.test(clean) && !hasIntentWords) {
     result.isOrderConfirmed = true;
+  }
+
+  // 7. Damage complaint detection
+  if (
+    /(ভেঙে\s*গেছে|ভেঙ্গে\s*গেছে|ভাঙা|ফেটে\s*গেছে|মধু\s*পড়ে\s*গেছে|মধু\s*পড়ে\s*গেসে|মধু\s*পরে\s*গেছে|মধু\s*পরে\s*গেসে|ক্ষতিগ্রস্ত|নষ্ট|লিক|ফুটো|পড়ে\s*গেছে|damaged?|broken)/i.test(
+      text,
+    )
+  ) {
+    result.isDamageComplaint = true;
   }
 
   return result;

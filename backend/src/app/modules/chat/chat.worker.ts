@@ -220,7 +220,7 @@ export const setupChatWorker = () => {
         // 3.2 Video / Vision Branch: Damaged Jar / Packaging Complaint (Section 30)
         if (videoResult?.isDamaged || visionResult?.imageCategory === 'COMPLAINT_DAMAGE') {
           const damageReply =
-            'আপনার পাঠানো ভিডিও/ছবিটি আমরা পর্যালোচনা করেছি। পার্সেল বা মধুর বয়াম ক্ষতিগ্রস্ত হওয়ার জন্য আমরা আন্তরিকভাবে দুঃখিত!\n\nRoyal Honey BD-এর নিয়ম অনুযায়ী ডেলিভারিতে পার্সেল বা বয়াম ক্ষতিগ্রস্ত হলে আমরা সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দিই।\n\nবিষয়টি এখনই অগ্রাধিকার ভিত্তিতে আমাদের সাপোর্ট টিম ও ওনারের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের একজন প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।\n\nজরুরি প্রয়োজনে হেল্পলাইনেও সরাসরি যোগাযোগ করতে পারেন: 01604121107 ❤️';
+            'আপনার পাঠানো ভিডিও/ছবিটি আমরা পর্যালোচনা করেছি স্যার। পার্সেল বা মধুর বয়াম ক্ষতিগ্রস্ত হওয়ার জন্য আমরা আন্তরিকভাবে দুঃখ প্রকাশ করছি।\n\nRoyal Honey BD-এর নিয়ম অনুযায়ী ডেলিভারিতে পার্সেল বা বয়াম ক্ষতিগ্রস্ত হলে আমরা সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দিই।\n\nবিষয়টি এখনই অগ্রাধিকার ভিত্তিতে আমাদের সাপোর্ট টিম ও ওনারের কাছে পাঠানো হয়েছে। খুব দ্রুত আমাদের একজন প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।\n\nজরুরি প্রয়োজনে হেল্পলাইনেও সরাসরি যোগাযোগ করতে পারেন: 01604121107';
 
           await ChatServices.takeoverConversation(conversation.id);
           await ChatServices.saveAiMessage(conversation.id, damageReply);
@@ -340,6 +340,27 @@ export const setupChatWorker = () => {
             extracted.customerInfo,
           );
           activeCustomerId = session.customerId;
+        }
+
+        // 6.1 Text Damage / Broken Jar / Packaging Complaint Handoff
+        const isTextDamageComplaint =
+          extracted.isDamageComplaint ||
+          /(ভেঙে\s*গেছে|ভেঙ্গে\s*গেছে|ভাঙা\s*(বয়াম|পার্সেল|বোতল|জার|কাঁচ)|(বয়াম|পার্সেল|বোতল|জার)\s*ভেঙে|মধু\s*পড়ে\s*গেছে|মধু\s*পড়ে\s*গেসে|মধু\s*পরে\s*গেছে|মধু\s*পরে\s*গেসে|ক্ষতিগ্রস্ত|নষ্ট\s*মধু|মধু\s*নষ্ট|লিক\s*হয়ে|ফুটো\s*হয়ে|ফেটে\s*গেছে|broken\s*jar|damaged\s*parcel)/i.test(
+            processedText,
+          );
+
+        if (isTextDamageComplaint) {
+          const customerGreeting = session.name ? `${session.name} স্যার` : 'স্যার';
+          const damageReply = `অত্যন্ত দুঃখিত ${customerGreeting}! ডেলিভারির অসাবধানতায় আপনার পার্সেল বা মধুর বয়াম ক্ষতিগ্রস্ত হওয়ায় আমরা আন্তরিকভাবে ক্ষমাপ্রার্থী।\n\nRoyal Honey BD-এর নিয়ম অনুযায়ী পার্সেল বা বয়াম ক্ষতিগ্রস্ত হলে আমরা সম্পূর্ণ বিনামূল্যে নতুন পার্সেল রিপ্লেস করে দিই।\n\nঅনুগ্রহ করে ক্ষতিগ্রস্ত বয়াম বা পার্সেলটির একটি ছবি বা আনবক্সিং ভিডিও আমাদের ইনবক্সে একটু পাঠিয়ে দিন। বিষয়টি এখনই অগ্রাধিকার ভিত্তিতে আমাদের সাপোর্ট টিম ও ম্যানেজমেন্টকে জানানো হয়েছে, খুব দ্রুত একজন প্রতিনিধি আপনার সাথে যোগাযোগ করবেন।\n\nজরুরি প্রয়োজনে সরাসরি আমাদের হেল্পলাইনেও ফোন করতে পারেন: 01604121107`;
+
+          await ChatServices.takeoverConversation(conversation.id);
+          await ChatServices.saveAiMessage(conversation.id, damageReply);
+          await MessageSender.dispatchReply(channel, channelId, damageReply);
+          return {
+            status: 'completed',
+            reason: 'text_damage_complaint_handoff',
+            conversationId: conversation.id,
+          };
         }
 
         // 7. Apply Cart Modifications (Real-time Stock Validation)

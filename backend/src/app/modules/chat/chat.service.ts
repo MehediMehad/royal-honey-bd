@@ -7,6 +7,7 @@ import {
 import prisma from '../../libs/prisma';
 import type { IProcessMessageJob, IRecentMessageContext } from './chat.interface';
 import { CustomerIdentityService } from '../customer/customer.identity';
+import { redis } from '../../libs/redis';
 
 const getOrCreateCustomerAndConversation = async (job: IProcessMessageJob) => {
   const result = await CustomerIdentityService.resolveCustomerIdentity(job);
@@ -483,6 +484,38 @@ const sendAgentReply = async (
   return message;
 };
 
+/**
+ * Get global AI Auto-Reply status from Redis
+ */
+const getGlobalAiStatus = async (): Promise<{ isAiEnabled: boolean }> => {
+  const status = await redis.get('config:global_ai_auto_reply');
+  return { isAiEnabled: status !== 'false' };
+};
+
+/**
+ * Toggle or explicitly set global AI Auto-Reply status in Redis & broadcast via Socket.io
+ */
+const setGlobalAiStatus = async (enabled?: boolean): Promise<{ isAiEnabled: boolean }> => {
+  let targetState: boolean;
+  if (typeof enabled === 'boolean') {
+    targetState = enabled;
+  } else {
+    const current = await redis.get('config:global_ai_auto_reply');
+    targetState = current === 'false';
+  }
+
+  await redis.set('config:global_ai_auto_reply', targetState ? 'true' : 'false');
+
+  try {
+    const { emitSocketEvent } = await import('../../libs/socket');
+    emitSocketEvent('chat:global_ai_status', { isAiEnabled: targetState });
+  } catch (socketErr) {
+    console.warn('⚠️ [Socket.io] Failed to emit chat:global_ai_status:', socketErr);
+  }
+
+  return { isAiEnabled: targetState };
+};
+
 export const ChatServices = {
   getOrCreateCustomerAndConversation,
   saveCustomerMessage,
@@ -494,5 +527,7 @@ export const ChatServices = {
   takeoverConversation,
   resumeAi,
   sendAgentReply,
+  getGlobalAiStatus,
+  setGlobalAiStatus,
 };
 

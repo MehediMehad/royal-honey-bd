@@ -48,5 +48,15 @@ export const chatService = {
       { content: text, text }
     );
   },
+
+  async getGlobalAiStatus(): Promise<ApiResponse<{ isAiEnabled: boolean }>> {
+    return apiClient.get<{ isAiEnabled: boolean }>(API_ENDPOINTS.CHAT.GLOBAL_AI_STATUS);
+  },
+
+  async toggleGlobalAi(enabled?: boolean): Promise<ApiResponse<{ isAiEnabled: boolean }>> {
+    return apiClient.post<{ isAiEnabled: boolean }>(API_ENDPOINTS.CHAT.TOGGLE_GLOBAL_AI, {
+      enabled,
+    });
+  },
 };
 

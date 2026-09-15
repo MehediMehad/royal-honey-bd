@@ -35,5 +35,17 @@ router.post(
   ChatControllers.sendAgentReply,
 );
 
+router.get(
+  '/global-ai-status',
+  auth(AdminRoleEnum.OWNER, AdminRoleEnum.SUPPORT_AGENT),
+  ChatControllers.getGlobalAiStatus,
+);
+
+router.post(
+  '/toggle-global-ai',
+  auth(AdminRoleEnum.OWNER, AdminRoleEnum.SUPPORT_AGENT),
+  ChatControllers.toggleGlobalAi,
+);
+
 export const ChatRoutes = router;
 

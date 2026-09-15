@@ -66,6 +66,8 @@ export const API_ENDPOINTS = {
     TAKEOVER: (id: string) => `/chat/conversations/${id}/takeover`,
     RESUME_AI: (id: string) => `/chat/conversations/${id}/resume-ai`,
     REPLY: (id: string) => `/chat/conversations/${id}/reply`,
+    GLOBAL_AI_STATUS: "/chat/global-ai-status",
+    TOGGLE_GLOBAL_AI: "/chat/toggle-global-ai",
   },
   ANALYTICS: {
     OVERVIEW: (timeframe?: string) =>

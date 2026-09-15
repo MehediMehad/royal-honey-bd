@@ -192,6 +192,19 @@ export const setupChatWorker = () => {
           await ChatServices.saveCustomerMessage(conversation.id, content, undefined, MessageType.TEXT);
         }
 
+        // 2.9 Check Global AI Auto-Reply Switch (Admin Manual Mode)
+        const globalAiStatus = await redis.get('config:global_ai_auto_reply');
+        if (globalAiStatus === 'false') {
+          console.log(
+            `⏸️ [ChatWorker] Global AI auto-reply is DISABLED by Admin. Skipping AI reply for conversation ${conversation.id}. Message logged for manual human reply.`,
+          );
+          return {
+            status: 'skipped',
+            reason: 'GLOBAL_AI_DISABLED',
+            conversationId: conversation.id,
+          };
+        }
+
         // 3. Check if human agent has taken over
         if (conversation.status === ConversationStatus.HUMAN_TAKEOVER) {
           console.log(

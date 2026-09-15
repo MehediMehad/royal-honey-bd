@@ -81,11 +81,38 @@ const sendAgentReply = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getGlobalAiStatus = catchAsync(async (req: Request, res: Response) => {
+  const result = await ChatServices.getGlobalAiStatus();
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'Global AI status retrieved successfully',
+    data: result,
+  });
+});
+
+const toggleGlobalAi = catchAsync(async (req: Request, res: Response) => {
+  const enabled = req.body?.enabled !== undefined ? Boolean(req.body.enabled) : undefined;
+  const result = await ChatServices.setGlobalAiStatus(enabled);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.isAiEnabled
+      ? 'AI automation auto-reply enabled globally'
+      : 'AI automation auto-reply paused globally (Manual mode active)',
+    data: result,
+  });
+});
+
 export const ChatControllers = {
   getAllConversations,
   getConversationMessages,
   takeoverConversation,
   resumeAi,
   sendAgentReply,
+  getGlobalAiStatus,
+  toggleGlobalAi,
 };
 

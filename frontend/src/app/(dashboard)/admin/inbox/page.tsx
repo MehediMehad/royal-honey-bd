@@ -75,10 +75,64 @@ export default function AdminInboxPage() {
   // Category / Status Filter (All, Unreplied, Ordered, Incomplete Cart, AI, Takeover)
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("ALL");
 
+  // Global AI Auto-Reply Switch State
+  const [isGlobalAiActive, setIsGlobalAiActive] = useState<boolean>(true);
+  const [isTogglingAi, setIsTogglingAi] = useState<boolean>(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Fetch initial global AI status and listen for socket updates
+  useEffect(() => {
+    const fetchGlobalAi = async () => {
+      try {
+        const res = await chatService.getGlobalAiStatus();
+        if (res.success && res.data) {
+          setIsGlobalAiActive(res.data.isAiEnabled);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch global AI status:", err);
+      }
+    };
+    fetchGlobalAi();
+
+    const socket = getSocket();
+    const handleGlobalAiStatus = (data: { isAiEnabled: boolean }) => {
+      setIsGlobalAiActive(data.isAiEnabled);
+    };
+    socket.on("chat:global_ai_status", handleGlobalAiStatus);
+    return () => {
+      socket.off("chat:global_ai_status", handleGlobalAiStatus);
+    };
+  }, []);
+
+  const handleToggleGlobalAi = async () => {
+    setIsTogglingAi(true);
+    try {
+      const nextState = !isGlobalAiActive;
+      const res = await chatService.toggleGlobalAi(nextState);
+      if (res.success && res.data) {
+        setIsGlobalAiActive(res.data.isAiEnabled);
+        if (res.data.isAiEnabled) {
+          toast.success(
+            "AI অটো-রিপ্লাই সফলভাবে চালু করা হয়েছে! এখন এআই স্বয়ংক্রিয়ভাবে মেসেজের উত্তর দেবে।"
+          );
+        } else {
+          toast.warning(
+            "AI অটো-রিপ্লাই বন্ধ করা হয়েছে! এখন সব মেসেজে মানুষকে ম্যানুয়ালি রিপ্লাই দিতে হবে।"
+          );
+        }
+      }
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : "AI স্ট্যাটাস পরিবর্তন করতে সমস্যা হয়েছে"
+      );
+    } finally {
+      setIsTogglingAi(false);
+    }
   };
 
   const fetchConversations = useCallback(async () => {
@@ -487,8 +541,56 @@ export default function AdminInboxPage() {
           </button>
         </div>
 
-        {/* Quick KPI Status Ribbon (Inspired by reference screenshot) */}
-        <div className="flex items-center gap-2">
+        {/* Quick KPI Status Ribbon & Global AI Auto-Reply Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 🤖 Global AI Auto-Reply Switch Button */}
+          <button
+            onClick={handleToggleGlobalAi}
+            disabled={isTogglingAi}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border shadow-2xs ${
+              isGlobalAiActive
+                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
+                : "bg-rose-500/15 border-rose-500/35 text-rose-700 dark:text-rose-300 hover:bg-rose-500/25 animate-pulse"
+            }`}
+            title={
+              isGlobalAiActive
+                ? "ক্লিক করলে AI Agent স্বয়ংক্রিয় রিপ্লাই দেওয়া বন্ধ করবে এবং সম্পূর্ণ ম্যানুয়াল মোড চালু হবে (সব মেসেজে মানুষকে রিপ্লাই দিতে হবে)"
+                : "ক্লিক করলে AI Agent পুনরায় স্বয়ংক্রিয়ভাবে মেসেজের উত্তর দেওয়া শুরু করবে"
+            }
+          >
+            <div className="flex items-center gap-1.5">
+              {isTogglingAi ? (
+                <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+              ) : isGlobalAiActive ? (
+                <>
+                  <span className="relative flex size-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full size-2 bg-emerald-500"></span>
+                  </span>
+                  <Bot className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>AI অটো-রিপ্লাই: চালু</span>
+                </>
+              ) : (
+                <>
+                  <span className="relative inline-flex rounded-full size-2 bg-rose-500"></span>
+                  <UserCheck className="size-3.5 text-rose-600 dark:text-rose-400" />
+                  <span>ম্যানুয়াল মোড (AI বন্ধ)</span>
+                </>
+              )}
+            </div>
+
+            {/* Mini Visual Toggle Switch Pill */}
+            <div
+              className={`w-6 h-3.5 rounded-full transition-colors flex items-center p-0.5 ${
+                isGlobalAiActive
+                  ? "bg-emerald-600 justify-end"
+                  : "bg-neutral-400 dark:bg-neutral-600 justify-start"
+              }`}
+            >
+              <div className="size-2.5 rounded-full bg-white shadow-xs"></div>
+            </div>
+          </button>
+
           {liveStats.unreplied > 0 ? (
             <div
               onClick={() => setCategoryFilter("UNREPLIED")}
@@ -805,14 +907,18 @@ export default function AdminInboxPage() {
 
                     <Badge
                       className={`text-[10px] font-bold border-0 ${
-                        activeConversation.status === "AI_ACTIVE"
-                          ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
-                          : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        !isGlobalAiActive
+                          ? "bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30"
+                          : activeConversation.status === "AI_ACTIVE"
+                            ? "bg-purple-500/15 text-purple-600 dark:text-purple-400"
+                            : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
                       }`}
                     >
-                      {activeConversation.status === "AI_ACTIVE"
-                        ? "🤖 AI Bot স্বয়ংক্রিয় উত্তর দিচ্ছে"
-                        : "👤 হিউম্যান এজেন্ট টেকওভার"}
+                      {!isGlobalAiActive
+                        ? "⏸️ গ্লোবাল AI বন্ধ (ম্যানুয়াল মোড)"
+                        : activeConversation.status === "AI_ACTIVE"
+                          ? "🤖 AI Bot স্বয়ংক্রিয় উত্তর দিচ্ছে"
+                          : "👤 হিউম্যান এজেন্ট টেকওভার"}
                     </Badge>
                   </div>
 

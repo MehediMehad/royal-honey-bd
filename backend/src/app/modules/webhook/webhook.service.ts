@@ -1,6 +1,7 @@
 import config from '../../../configs';
 import { chatMessageQueue } from '../../libs/queue';
 import { acquireMessageLock } from '../../libs/idempotency';
+import { redis } from '../../libs/redis';
 import type {
   IMetaWebhookPayload,
   IMetaWebhookQuery,
@@ -184,7 +185,7 @@ const processIncomingWebhook = async (payload: IMetaWebhookPayload) => {
     return { queued: 0, message: 'No actionable messages extracted' };
   }
 
-  // Deduplicate messages using Redis distributed lock
+  // Deduplicate identical message IDs using Redis distributed lock
   const validMessages: INormalizedIncomingMessage[] = [];
   for (const msg of messages) {
     const isNew = await acquireMessageLock(`${msg.channel}_${msg.messageId}`);
@@ -197,21 +198,41 @@ const processIncomingWebhook = async (payload: IMetaWebhookPayload) => {
     return { queued: 0, message: 'All incoming messages were deduplicated (already processed)' };
   }
 
-  const jobPromises = validMessages.map((msg) =>
-    chatMessageQueue.add(
-      'process-chat-message',
-      msg,
-      {
-        jobId: `${msg.channel}_${msg.messageId}`, // Deduplication key!
-      },
-    ),
-  );
+  // Buffer messages in Redis and enqueue debounced job per customer channel
+  const jobPromises = validMessages.map(async (msg) => {
+    const bufferKey = `chat:msg_buffer:${msg.channel}:${msg.channelId}`;
+    try {
+      await redis.rpush(bufferKey, JSON.stringify(msg));
+      await redis.expire(bufferKey, 60);
+    } catch (err: any) {
+      console.warn('⚠️ [Webhook] Redis message buffer error:', err?.message || err);
+    }
+
+    const hasMedia = !!msg.mediaUrl || msg.mediaType !== 'TEXT';
+    const delayMs = hasMedia ? 0 : 1500; // 1.5 second debounce for rapid typing
+    const bufferJobId = `buf_${msg.channel}_${msg.channelId}`;
+
+    try {
+      await chatMessageQueue.add(
+        'process-chat-message',
+        msg,
+        {
+          jobId: bufferJobId,
+          delay: delayMs,
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+    } catch (queueErr) {
+      // If job already scheduled in delay, BullMQ deduplicates it!
+    }
+  });
 
   await Promise.all(jobPromises);
 
   return {
     queued: validMessages.length,
-    message: `Successfully enqueued ${validMessages.length} message(s) to BullMQ`,
+    message: `Successfully buffered and enqueued ${validMessages.length} message(s) to BullMQ`,
   };
 };
 

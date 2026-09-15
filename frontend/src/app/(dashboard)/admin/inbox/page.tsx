@@ -356,17 +356,28 @@ export default function AdminInboxPage() {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
           <button
             onClick={() => setChannelFilter("ALL")}
+            style={
+              channelFilter === "ALL"
+                ? { backgroundColor: "#f59e0b", color: "#ffffff" }
+                : undefined
+            }
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               channelFilter === "ALL"
-                ? "bg-foreground text-background shadow-xs"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                ? "bg-amber-500 text-white shadow-xs shadow-amber-500/25"
+                : "text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400"
             }`}
           >
+            <MessageSquare className="size-3.5" />
             <span>সব চ্যানেল</span>
             <span
+              style={
+                channelFilter === "ALL"
+                  ? { backgroundColor: "rgba(255,255,255,0.25)", color: "#ffffff" }
+                  : undefined
+              }
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 channelFilter === "ALL"
-                  ? "bg-background/20 text-background"
+                  ? "bg-white/25 text-white"
                   : "bg-muted text-foreground"
               }`}
             >
@@ -458,8 +469,8 @@ export default function AdminInboxPage() {
             onClick={() => setChannelFilter("TAKEOVER")}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
               channelFilter === "TAKEOVER"
-                ? "bg-amber-500 text-white shadow-xs"
-                : "text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600"
+                ? "bg-purple-600 text-white shadow-xs shadow-purple-500/25"
+                : "text-muted-foreground hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400"
             }`}
           >
             <UserCheck className="size-3.5" />
@@ -468,7 +479,7 @@ export default function AdminInboxPage() {
               className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                 channelFilter === "TAKEOVER"
                   ? "bg-white/20 text-white"
-                  : "bg-amber-500/15 text-amber-700"
+                  : "bg-purple-500/15 text-purple-700 dark:text-purple-300"
               }`}
             >
               {liveStats.takeover}
@@ -525,14 +536,27 @@ export default function AdminInboxPage() {
             <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px] font-bold">
               <button
                 onClick={() => setCategoryFilter("ALL")}
+                style={
+                  categoryFilter === "ALL"
+                    ? { backgroundColor: "#f59e0b", color: "#ffffff" }
+                    : undefined
+                }
                 className={`px-2.5 py-1 rounded-lg transition-all shrink-0 flex items-center gap-1 ${
                   categoryFilter === "ALL"
-                    ? "bg-foreground text-background shadow-xs"
-                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                    ? "bg-amber-500 text-white shadow-xs shadow-amber-500/25"
+                    : "bg-muted/50 text-muted-foreground hover:bg-amber-500/10 hover:text-amber-600"
                 }`}
               >
                 <span>সব</span>
-                <span className="text-[10px] opacity-80">{liveStats.total}</span>
+                <span
+                  className={`text-[10px] px-1 rounded-full ${
+                    categoryFilter === "ALL"
+                      ? "bg-white/20 text-white font-extrabold"
+                      : "opacity-80"
+                  }`}
+                >
+                  {liveStats.total}
+                </span>
               </button>
 
               <button
@@ -549,7 +573,7 @@ export default function AdminInboxPage() {
                 <span
                   className={`text-[10px] px-1 rounded-full ${
                     categoryFilter === "UNREPLIED"
-                      ? "bg-white/20 text-white"
+                      ? "bg-white/20 text-white font-extrabold"
                       : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
                   }`}
                 >
@@ -585,12 +609,20 @@ export default function AdminInboxPage() {
                 onClick={() => setCategoryFilter("TAKEOVER")}
                 className={`px-2.5 py-1 rounded-lg transition-all shrink-0 flex items-center gap-1 ${
                   categoryFilter === "TAKEOVER"
-                    ? "bg-amber-500 text-white shadow-xs"
-                    : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                    ? "bg-purple-600 text-white shadow-xs shadow-purple-500/25"
+                    : "bg-muted/50 text-muted-foreground hover:bg-purple-500/10 hover:text-purple-600"
                 }`}
               >
                 <span>টেকওভার</span>
-                <span className="text-[10px] opacity-80">{liveStats.takeover}</span>
+                <span
+                  className={`text-[10px] px-1 rounded-full ${
+                    categoryFilter === "TAKEOVER"
+                      ? "bg-white/20 text-white font-extrabold"
+                      : "opacity-80"
+                  }`}
+                >
+                  {liveStats.takeover}
+                </span>
               </button>
             </div>
           </div>

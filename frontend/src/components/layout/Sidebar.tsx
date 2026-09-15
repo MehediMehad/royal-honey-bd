@@ -121,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ className, onNavigate }) => {
         {/* Brand Header */}
         <div className="flex h-20 items-center gap-3 border-b border-border/80 px-6">
           <Link href="/admin" className="flex items-center gap-3 group">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white font-extrabold shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-linear-to-tr from-amber-500 to-yellow-400 text-white font-extrabold shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
               🍯
             </div>
             <div className="flex flex-col">
